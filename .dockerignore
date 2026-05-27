@@ -1,0 +1,21 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.prod.example
+README.md
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Frontend handled by its own image
+frontend/
+
+# Local dev artifacts
+*.log
+/tmp/
+.vscode/
+.idea/
+
+# Docs and prototypes — not needed in runtime image
+docs/

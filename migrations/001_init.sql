@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS users (
+    id                  BIGSERIAL PRIMARY KEY,
+    telegram_user_id    BIGINT UNIQUE NOT NULL,
+    username            TEXT,
+    display_name        TEXT,
+    birth_date          DATE NOT NULL,
+    birth_time          TIME,
+    birth_place         TEXT NOT NULL,
+    birth_lat           FLOAT NOT NULL,
+    birth_lon           FLOAT NOT NULL,
+    birth_tzone         FLOAT NOT NULL,
+    gender              TEXT,
+    style               TEXT NOT NULL DEFAULT 'gentle',
+    focus               TEXT NOT NULL DEFAULT 'self',
+    personalization     JSONB NOT NULL DEFAULT '{}'::jsonb,
+    pro_status          TEXT NOT NULL DEFAULT 'free',
+    pro_activated_at    TIMESTAMPTZ,
+    trial_ends_at       TIMESTAMPTZ,
+    sub_ends_at         TIMESTAMPTZ,
+    push_enabled        BOOLEAN NOT NULL DEFAULT true,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

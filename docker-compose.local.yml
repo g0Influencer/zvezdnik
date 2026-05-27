@@ -1,0 +1,17 @@
+# Override for local prod-compose dry-run.
+# Usage:
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.local.yml up -d --build
+#   curl http://localhost:8081/health
+#   docker compose -f docker-compose.prod.yml -f docker-compose.local.yml down
+
+services:
+  web:
+    ports: !override
+      - "8081:80"
+    # Replace the prod template mount + the letsencrypt mount entirely.
+    # local.conf has no ${...} placeholders, so the image's envsubst step
+    # is effectively a no-op and the result is dropped into conf.d.
+    volumes: !override
+      - ./nginx/local.conf:/etc/nginx/templates/default.conf.template:ro
+    environment: !override
+      PROD_DOMAIN: localhost

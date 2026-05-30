@@ -4,7 +4,7 @@ package domain
 const VoidMonthlyCredits = 20
 
 // VoidFreeCredits — one-time quota for free users (no monthly refresh).
-const VoidFreeCredits = 1
+const VoidFreeCredits = 2
 
 // VoidParams is the input for LLM void/oracle generation.
 type VoidParams struct {

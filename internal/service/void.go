@@ -69,10 +69,9 @@ func (s *VoidService) History(ctx context.Context, user *domain.User) (*VoidHist
 }
 
 func (s *VoidService) Ask(ctx context.Context, user *domain.User, question string) (*VoidAskResult, error) {
-	if !domain.IsPro(user) {
-		return nil, domain.ErrProRequired
-	}
-
+	// Both free and PRO users can ask, gated only by remaining credits:
+	// free users get a one-time VoidFreeCredits, PRO users get VoidMonthlyCredits
+	// refreshed monthly (see ensureCredits). Running out yields ErrVoidNoCredits.
 	remaining, err := s.ensureCredits(ctx, user)
 	if err != nil {
 		return nil, err

@@ -99,7 +99,12 @@ func main() {
 	compatibilityH := handler.NewCompatibilityHandler(compatibilitySvc)
 
 	// Init Telegram bot
-	tgBot := bot.NewBot(cfg.TelegramBotToken, cfg.TelegramMiniAppURL)
+	tgBot := bot.NewBot(cfg.TelegramBotToken, cfg.TelegramMiniAppURL, bot.LegalInfo{
+		OfferURL:        cfg.OfferURL,
+		SupplierName:    cfg.SupplierName,
+		SupplierINN:     cfg.SupplierINN,
+		SupplierContact: cfg.SupplierContact,
+	})
 
 	// Set webhook if URL is configured
 	if cfg.WebhookBaseURL != "" {
@@ -107,6 +112,11 @@ func main() {
 		if err := tgBot.SetWebhook(ctx, webhookURL); err != nil {
 			slog.Error("failed to set telegram webhook", "error", err)
 		}
+	}
+
+	// Register the bot command menu (/start, /help, /oferta).
+	if err := tgBot.SetMyCommands(ctx); err != nil {
+		slog.Error("failed to set telegram bot commands", "error", err)
 	}
 
 	// Init router

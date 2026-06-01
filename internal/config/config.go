@@ -30,6 +30,13 @@ type Config struct {
 	TrialDays int
 
 	SheetsSpreadsheetID string
+
+	// Legal info for payment-provider compliance, surfaced via the bot's
+	// /oferta command and a pinned message on /start.
+	OfferURL        string
+	SupplierName    string
+	SupplierINN     string
+	SupplierContact string
 }
 
 func init() {
@@ -86,6 +93,11 @@ func Load() *Config {
 		TrialDays: trialDays,
 
 		SheetsSpreadsheetID: getEnv("SHEETS_SPREADSHEET_ID", "1Sjj2dEv6Zz_QnYB4BB0ON-4e9TepUnyrjXUjjKwNzEM"),
+
+		OfferURL:        os.Getenv("OFFER_URL"),
+		SupplierName:    os.Getenv("SUPPLIER_NAME"),
+		SupplierINN:     os.Getenv("SUPPLIER_INN"),
+		SupplierContact: os.Getenv("SUPPLIER_CONTACT"),
 	}
 }
 

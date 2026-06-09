@@ -7,7 +7,8 @@ import { BottomNav } from '@/components/BottomNav';
 import { MainScreenStarBackground } from '@/components/MainScreenStarBackground';
 import { DayPicker, formatSelectedDateLabel } from '@/components/DayPicker';
 import { useAppStore } from '@/lib/store';
-import { haptic } from '@/lib/telegram';
+import { haptic, hapticNotification, openLink } from '@/lib/telegram';
+import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { reachGoal } from '@/lib/metrika';
@@ -368,10 +369,16 @@ export default function Today() {
                 PRO-подписку — 299 ₽/мес.
               </p>
               <button
-                onClick={() => {
+                onClick={async () => {
                   haptic('medium');
-                  setPaywallOpen(false);
-                  toast({ title: 'Подписка скоро будет доступна' });
+                  try {
+                    const res = await api.createPayment('monthly_pro');
+                    openLink(res.payment_url);
+                    setPaywallOpen(false);
+                  } catch {
+                    hapticNotification('error');
+                    toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
+                  }
                 }}
                 className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors mb-3"
               >

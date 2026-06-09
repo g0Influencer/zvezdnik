@@ -28,7 +28,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { useAppStore } from '@/lib/store';
 import { getZodiacSign, STYLE_LABELS } from '@/lib/zodiac';
 import { api } from '@/lib/api';
-import { haptic, hapticNotification } from '@/lib/telegram';
+import { haptic, hapticNotification, openLink } from '@/lib/telegram';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { AREAS } from '@/lib/onboarding-config';
@@ -109,12 +109,20 @@ export default function Profile() {
   };
 
   const handleEnablePro = async () => {
-    if (!import.meta.env.DEV) {
-      toast({ title: 'Подписка скоро будет доступна' });
+    // Dev shortcut: flip status directly without paying.
+    if (import.meta.env.DEV) {
+      await updateField('pro_status', 'active');
+      toast({ title: 'PRO активирован' });
       return;
     }
-    await updateField('pro_status', 'active');
-    toast({ title: 'PRO активирован' });
+    haptic('medium');
+    try {
+      const res = await api.createPayment('monthly_pro');
+      openLink(res.payment_url);
+    } catch {
+      hapticNotification('error');
+      toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
+    }
   };
 
   const handleCancelPro = async () => {

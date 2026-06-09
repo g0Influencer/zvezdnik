@@ -9,7 +9,10 @@ import (
 	"zvezdnik/internal/db"
 )
 
-const fallbackPushTitle = "Звёздник: твой день готов 🌙"
+const (
+	fallbackPushTitle = "Звёздник: твой день готов 🌙"
+	pushButtonLabel   = "Подробнее"
+)
 
 type PushScheduler struct {
 	bot     *Bot
@@ -37,13 +40,22 @@ func (ps *PushScheduler) SendDailyPushes(ctx context.Context) error {
 
 	for _, user := range users {
 		title := fallbackPushTitle
+		var shortDesc string
 		if tip != nil {
 			if t := tip.PickTitle(user.Style); t != "" {
 				title = t
 			}
+			shortDesc = tip.PickShortDescription(user.Style)
 		}
 
-		if err := ps.bot.SendMessageWithMiniApp(ctx, user.TelegramUserID, title); err != nil {
+		// Title, blank line, then the short teaser (same copy shown on the
+		// app's main screen). The button reads "Подробнее" and opens the app.
+		text := title
+		if shortDesc != "" {
+			text = title + "\n\n" + shortDesc
+		}
+
+		if err := ps.bot.SendMessageWithMiniAppButton(ctx, user.TelegramUserID, text, pushButtonLabel); err != nil {
 			slog.Error("daily push: send failed",
 				"user_id", user.ID,
 				"telegram_user_id", user.TelegramUserID,

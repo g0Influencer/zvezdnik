@@ -23,8 +23,16 @@ type Config struct {
 
 	AstroNatalChartURL string
 
-	ProdamusShopURL   string
-	ProdamusSecretKey string
+	// Robokassa payment credentials. Hash algo must match the cabinet's
+	// "Технические настройки"; Fiscal attaches a receipt (самозанятый, НПД).
+	RobokassaMerchantLogin string
+	RobokassaPassword1     string
+	RobokassaPassword2     string
+	RobokassaTestPassword1 string
+	RobokassaTestPassword2 string
+	RobokassaIsTest        bool
+	RobokassaHashAlgo      string
+	RobokassaFiscal        bool
 
 	PushCron  string
 	TrialDays int
@@ -86,8 +94,14 @@ func Load() *Config {
 
 		AstroNatalChartURL: os.Getenv("ASTRO_NATAL_CHART_URL"),
 
-		ProdamusShopURL:   os.Getenv("PRODAMUS_SHOP_URL"),
-		ProdamusSecretKey: os.Getenv("PRODAMUS_SECRET_KEY"),
+		RobokassaMerchantLogin: os.Getenv("ROBOKASSA_MERCHANT_LOGIN"),
+		RobokassaPassword1:     os.Getenv("ROBOKASSA_PASSWORD1"),
+		RobokassaPassword2:     os.Getenv("ROBOKASSA_PASSWORD2"),
+		RobokassaTestPassword1: os.Getenv("ROBOKASSA_TEST_PASSWORD1"),
+		RobokassaTestPassword2: os.Getenv("ROBOKASSA_TEST_PASSWORD2"),
+		RobokassaIsTest:        os.Getenv("ROBOKASSA_IS_TEST") == "true",
+		RobokassaHashAlgo:      getEnv("ROBOKASSA_HASH_ALGO", "md5"),
+		RobokassaFiscal:        os.Getenv("ROBOKASSA_FISCAL") == "true",
 
 		PushCron:  getEnv("PUSH_CRON", "0 9 * * *"),
 		TrialDays: trialDays,

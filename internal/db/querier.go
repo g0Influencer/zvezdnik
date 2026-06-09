@@ -33,6 +33,8 @@ type Querier interface {
 	ListPushEnabledUsers(ctx context.Context) ([]User, error)
 	ListVoidHistory(ctx context.Context, arg ListVoidHistoryParams) ([]VoidHistory, error)
 	MarkSubscriptionPaid(ctx context.Context, arg MarkSubscriptionPaidParams) error
+	// Returns 1 when this InvId is new (apply PRO), 0 when it's a duplicate delivery.
+	RecordCharge(ctx context.Context, arg RecordChargeParams) (int64, error)
 	RefreshCompatibilityCredits(ctx context.Context, arg RefreshCompatibilityCreditsParams) error
 	RefreshVoidCredits(ctx context.Context, arg RefreshVoidCreditsParams) error
 	UpdateNatalChartPortrait(ctx context.Context, arg UpdateNatalChartPortraitParams) error

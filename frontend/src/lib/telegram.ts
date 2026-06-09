@@ -17,6 +17,7 @@ declare global {
         ready: () => void;
         expand: () => void;
         close: () => void;
+        openLink: (url: string, options?: { try_instant_view?: boolean }) => void;
         MainButton: {
           text: string;
           color: string;
@@ -102,4 +103,14 @@ export function hapticNotification(type: 'success' | 'error' | 'warning' = 'succ
 
 export function isTelegramWebApp(): boolean {
   return !!tg?.initData;
+}
+
+// Opens an external URL (e.g. the Robokassa payment page) in the system browser.
+// Falls back to window.open when running outside Telegram.
+export function openLink(url: string) {
+  if (tg?.openLink) {
+    tg.openLink(url);
+  } else {
+    window.open(url, '_blank');
+  }
 }

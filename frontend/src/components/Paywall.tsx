@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { haptic } from '@/lib/telegram';
+import { haptic, hapticNotification, openLink } from '@/lib/telegram';
+import { api } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 import { MainScreenStarBackground } from '@/components/MainScreenStarBackground';
 
 type PaywallVariant = 'void' | 'longread';
@@ -20,15 +23,27 @@ const BENEFITS = [
 ];
 
 export function Paywall({ open, onClose }: PaywallProps) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
   const handleClose = () => {
     haptic('light');
     onClose();
   };
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     haptic('medium');
-    // TODO: integrate payment + reachGoal('subscription_activated') after success
-    onClose();
+    setLoading(true);
+    try {
+      const res = await api.createPayment('monthly_pro');
+      openLink(res.payment_url);
+      onClose();
+    } catch {
+      hapticNotification('error');
+      toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -123,10 +138,11 @@ export function Paywall({ open, onClose }: PaywallProps) {
 
               <button
                 onClick={handleSubscribe}
-                className="w-full py-4 text-[12px] font-semibold uppercase tracking-[0.3em] transition-opacity hover:opacity-90"
+                disabled={loading}
+                className="w-full py-4 text-[12px] font-semibold uppercase tracking-[0.3em] transition-opacity hover:opacity-90 disabled:opacity-60"
                 style={{ backgroundColor: 'hsl(0 0% 98%)', color: 'hsl(0 0% 4%)' }}
               >
-                Подключить
+                {loading ? 'Открываем оплату…' : 'Подключить'}
               </button>
 
               <p

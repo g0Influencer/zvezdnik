@@ -228,6 +228,13 @@ func (b *Bot) SendMessage(ctx context.Context, chatID int64, text string) error 
 }
 
 func (b *Bot) SendMessageWithMiniApp(ctx context.Context, chatID int64, text string) error {
+	return b.SendMessageWithMiniAppButton(ctx, chatID, text, "Открыть Звездник")
+}
+
+// SendMessageWithMiniAppButton sends a message with a single inline button that
+// opens the Mini App. buttonLabel tailors the call-to-action — e.g. "Подробнее"
+// for the daily push vs. the default "Открыть Звездник".
+func (b *Bot) SendMessageWithMiniAppButton(ctx context.Context, chatID int64, text, buttonLabel string) error {
 	return b.sendMessage(ctx, sendMessageRequest{
 		ChatID: chatID,
 		Text:   text,
@@ -235,7 +242,7 @@ func (b *Bot) SendMessageWithMiniApp(ctx context.Context, chatID int64, text str
 			InlineKeyboard: [][]inlineKeyboardButton{
 				{
 					{
-						Text:   "Открыть Звездник",
+						Text:   buttonLabel,
 						WebApp: &webAppInfo{URL: b.miniAppURL},
 					},
 				},

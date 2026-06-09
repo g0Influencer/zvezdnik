@@ -25,6 +25,7 @@ import (
 	"zvezdnik/internal/content"
 	"zvezdnik/internal/db"
 	"zvezdnik/internal/llm"
+	"zvezdnik/internal/payments"
 	"zvezdnik/internal/service"
 )
 
@@ -86,7 +87,17 @@ func main() {
 	todaySvc := service.NewTodayService(queries, astroClient, llmClient, rdb)
 	voidSvc := service.NewVoidService(queries, llmClient)
 	chartSvc := service.NewChartService(queries)
-	paymentsSvc := service.NewPaymentsService(queries, cfg.ProdamusShopURL, cfg.ProdamusSecretKey, cfg.WebhookBaseURL+"/payments/webhook")
+	robokassa := payments.NewClient(payments.Config{
+		MerchantLogin: cfg.RobokassaMerchantLogin,
+		Password1:     cfg.RobokassaPassword1,
+		Password2:     cfg.RobokassaPassword2,
+		TestPassword1: cfg.RobokassaTestPassword1,
+		TestPassword2: cfg.RobokassaTestPassword2,
+		IsTest:        cfg.RobokassaIsTest,
+		HashAlgo:      cfg.RobokassaHashAlgo,
+		Fiscal:        cfg.RobokassaFiscal,
+	})
+	paymentsSvc := service.NewPaymentsService(queries, robokassa)
 	compatibilitySvc := service.NewCompatibilityService(queries, llmClient)
 
 	// Init handlers

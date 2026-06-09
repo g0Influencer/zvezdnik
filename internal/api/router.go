@@ -42,7 +42,9 @@ func NewRouter(
 	// Telegram bot webhook (no auth needed, Telegram sends updates here)
 	r.Post("/bot/webhook", tgBot.HandleWebhook)
 
-	// Prodamus payment notification (no auth — signature is verified inside).
+	// Robokassa ResultURL (no auth — signature is verified inside). Robokassa
+	// may deliver it via GET or POST depending on the cabinet setting.
+	r.Get("/payments/webhook", payments.Webhook)
 	r.Post("/payments/webhook", payments.Webhook)
 
 	r.Route("/api", func(r chi.Router) {

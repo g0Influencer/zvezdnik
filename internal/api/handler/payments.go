@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"io"
+	"fmt"
+	"log/slog"
 	"net/http"
 
-	"zvezdnik/internal/httputil"
 	"zvezdnik/internal/api/middleware"
+	"zvezdnik/internal/httputil"
 	"zvezdnik/internal/service"
 )
 
@@ -40,17 +41,23 @@ func (h *PaymentsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, result)
 }
 
+// Webhook handles Robokassa's ResultURL (configured in the cabinet). Robokassa
+// may call it via GET or POST, so we read the merged form. On success we MUST
+// reply with the exact body "OK<InvId>" or Robokassa keeps retrying.
 func (h *PaymentsHandler) Webhook(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	invID, err := h.svc.HandleWebhook(r.Context(), r.Form)
 	if err != nil {
-		httputil.InternalError(w, err)
+		// Non-"OK" response signals failure; Robokassa will retry later.
+		slog.Error("payments: webhook failed", "error", err, "inv_id", invID)
+		http.Error(w, "payment processing failed", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.svc.HandleWebhook(r.Context(), body); err != nil {
-		httputil.InternalError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "OK%d", invID)
 }

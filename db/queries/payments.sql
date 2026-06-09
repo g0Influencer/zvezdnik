@@ -10,3 +10,9 @@ SELECT * FROM subscriptions WHERE id = $1;
 UPDATE subscriptions
 SET status = 'paid', paid_at = NOW(), provider_order_id = $2
 WHERE id = $1 AND status <> 'paid';
+
+-- name: RecordCharge :execrows
+-- Returns 1 when this InvId is new (apply PRO), 0 when it's a duplicate delivery.
+INSERT INTO payment_charges (inv_id, user_id, amount)
+VALUES ($1, $2, $3)
+ON CONFLICT (inv_id) DO NOTHING;

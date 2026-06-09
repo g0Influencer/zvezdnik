@@ -12,21 +12,25 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"zvezdnik/internal/domain"
 )
 
 // DailyTip is a single row from the daily_tips sheet, minimal fields needed
 // for a push notification.
 type DailyTip struct {
-	Date         string
-	SoftTitle    string
-	DirectTitle  string
-	IsActive     bool
+	Date                   string
+	SoftTitle              string
+	DirectTitle            string
+	SoftShortDescription   string
+	DirectShortDescription string
+	IsActive               bool
 }
 
 // PickTitle returns the title for the given user style. Falls back across
 // styles, then to a generic phrase if both are empty.
 func (t DailyTip) PickTitle(style string) string {
-	if style == "blunt" && t.DirectTitle != "" {
+	if style == domain.StyleBlunt && t.DirectTitle != "" {
 		return t.DirectTitle
 	}
 	if t.SoftTitle != "" {
@@ -36,6 +40,19 @@ func (t DailyTip) PickTitle(style string) string {
 		return t.DirectTitle
 	}
 	return ""
+}
+
+// PickShortDescription returns the short teaser for the given user style,
+// mirroring PickTitle's style/fallback logic. It's the same short description
+// shown on the app's main screen, surfaced under the title in the daily push.
+func (t DailyTip) PickShortDescription(style string) string {
+	if style == domain.StyleBlunt && t.DirectShortDescription != "" {
+		return t.DirectShortDescription
+	}
+	if t.SoftShortDescription != "" {
+		return t.SoftShortDescription
+	}
+	return t.DirectShortDescription
 }
 
 // DailyTipsClient fetches daily_tips rows from a public Google Sheet CSV.
@@ -142,10 +159,12 @@ func (c *DailyTipsClient) fetch(ctx context.Context) ([]DailyTip, error) {
 			continue
 		}
 		tips = append(tips, DailyTip{
-			Date:        get(row, "date"),
-			SoftTitle:   get(row, "soft_title"),
-			DirectTitle: get(row, "direct_title"),
-			IsActive:    isActive(get(row, "is_active")),
+			Date:                   get(row, "date"),
+			SoftTitle:              get(row, "soft_title"),
+			DirectTitle:            get(row, "direct_title"),
+			SoftShortDescription:   get(row, "soft_short_description"),
+			DirectShortDescription: get(row, "direct_short_description"),
+			IsActive:               isActive(get(row, "is_active")),
 		})
 	}
 	return tips, nil

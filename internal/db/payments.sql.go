@@ -63,3 +63,24 @@ func (q *Queries) MarkSubscriptionPaid(ctx context.Context, arg MarkSubscription
 	_, err := q.db.Exec(ctx, markSubscriptionPaid, arg.ID, arg.ProviderOrderID)
 	return err
 }
+
+const recordCharge = `-- name: RecordCharge :execrows
+INSERT INTO payment_charges (inv_id, user_id, amount)
+VALUES ($1, $2, $3)
+ON CONFLICT (inv_id) DO NOTHING
+`
+
+type RecordChargeParams struct {
+	InvID  int64 `json:"inv_id"`
+	UserID int64 `json:"user_id"`
+	Amount int32 `json:"amount"`
+}
+
+// Returns 1 when this InvId is new (apply PRO), 0 when it's a duplicate delivery.
+func (q *Queries) RecordCharge(ctx context.Context, arg RecordChargeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordCharge, arg.InvID, arg.UserID, arg.Amount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

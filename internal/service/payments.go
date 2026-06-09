@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 
 	"zvezdnik/internal/db"
@@ -21,29 +22,21 @@ type PaymentCreateResponse struct {
 
 type productSpec struct {
 	displayName string
-	rubles      int
-	kopecks     int32
+	rubles      float64
+	recurring   bool // first payment enrolls the card into a Robokassa subscription
 }
 
 var productCatalog = map[string]productSpec{
-	"monthly_pro": {displayName: "Звёздник PRO — 1 месяц", rubles: 299, kopecks: 29900},
-	"longread":    {displayName: "Лонгрид", rubles: 99, kopecks: 9900},
+	"monthly_pro": {displayName: "Звёздник PRO — подписка на месяц", rubles: 299, recurring: true},
 }
 
 type PaymentsService struct {
-	queries         *db.Queries
-	shopURL         string
-	secretKey       string
-	notificationURL string
+	queries *db.Queries
+	rk      *payments.Client
 }
 
-func NewPaymentsService(queries *db.Queries, shopURL, secretKey, notificationURL string) *PaymentsService {
-	return &PaymentsService{
-		queries:         queries,
-		shopURL:         shopURL,
-		secretKey:       secretKey,
-		notificationURL: notificationURL,
-	}
+func NewPaymentsService(queries *db.Queries, rk *payments.Client) *PaymentsService {
+	return &PaymentsService{queries: queries, rk: rk}
 }
 
 func (s *PaymentsService) CreatePayment(ctx context.Context, userID int64, req PaymentCreateRequest) (*PaymentCreateResponse, error) {
@@ -53,69 +46,75 @@ func (s *PaymentsService) CreatePayment(ctx context.Context, userID int64, req P
 	}
 
 	subID, err := s.queries.CreateSubscription(ctx, db.CreateSubscriptionParams{
-		UserID: userID, Type: req.Product, Amount: spec.kopecks,
+		UserID: userID, Type: req.Product, Amount: int32(spec.rubles * 100),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("payments: create subscription: %w", err)
 	}
 
-	orderID := strconv.FormatInt(subID, 10)
-	url, err := payments.BuildPaymentURL(s.shopURL, s.secretKey, payments.PaymentRequest{
-		OrderID:         orderID,
-		OrderNum:        orderID,
-		CustomerExtra:   fmt.Sprintf("user_id=%d", userID),
-		NotificationURL: s.notificationURL,
-		Products: []payments.Product{
-			{Name: spec.displayName, Price: strconv.Itoa(spec.rubles), Quantity: 1, SKU: req.Product},
-		},
+	payURL, err := s.rk.PaymentURL(payments.Invoice{
+		InvID:       subID,
+		AmountRub:   spec.rubles,
+		Description: spec.displayName,
+		UserID:      userID,
+		Recurring:   spec.recurring,
+		Items:       []payments.ReceiptItem{{Name: spec.displayName, Quantity: 1, SumRub: spec.rubles}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("payments: build url: %w", err)
 	}
-	return &PaymentCreateResponse{PaymentURL: url, PaymentID: orderID}, nil
+	return &PaymentCreateResponse{PaymentURL: payURL, PaymentID: strconv.FormatInt(subID, 10)}, nil
 }
 
-// HandleWebhook verifies the Prodamus signature, marks the subscription paid
-// and activates PRO for monthly_pro orders. Idempotent on re-delivery.
-func (s *PaymentsService) HandleWebhook(ctx context.Context, body []byte) error {
-	vals, err := payments.VerifyWebhook(s.secretKey, body)
+// HandleWebhook verifies a Robokassa ResultURL notification, extends PRO and
+// returns the InvId so the caller can answer "OK<InvId>". Idempotent per InvId,
+// so platform retries and recurring re-deliveries apply the charge only once.
+func (s *PaymentsService) HandleWebhook(ctx context.Context, values url.Values) (int64, error) {
+	res, err := s.rk.VerifyResult(values)
 	if err != nil {
-		return fmt.Errorf("payments: verify webhook: %w", err)
+		return 0, fmt.Errorf("payments: verify webhook: %w", err)
 	}
 
-	status := vals.Get("payment_status")
-	if status != "success" {
-		slog.Info("payments: webhook ignored non-success status", "status", status, "order_id", vals.Get("order_id"))
-		return nil
-	}
-
-	subID, err := strconv.ParseInt(vals.Get("order_id"), 10, 64)
-	if err != nil {
-		return fmt.Errorf("payments: invalid order_id %q: %w", vals.Get("order_id"), err)
-	}
-	sub, err := s.queries.GetSubscriptionByID(ctx, subID)
-	if err != nil {
-		return fmt.Errorf("payments: load subscription: %w", err)
-	}
-
-	providerRef := vals.Get("order_num")
-	if providerRef == "" {
-		providerRef = vals.Get("order_id")
-	}
-	if err := s.queries.MarkSubscriptionPaid(ctx, db.MarkSubscriptionPaidParams{
-		ID:              sub.ID,
-		ProviderOrderID: optionalStr(providerRef),
-	}); err != nil {
-		return fmt.Errorf("payments: mark paid: %w", err)
-	}
-
-	if sub.Type == "monthly_pro" {
-		if _, err := s.queries.ActivatePro(ctx, sub.UserID); err != nil {
-			return fmt.Errorf("payments: activate pro: %w", err)
+	// Resolve the user. Shp_userId rides along on the first payment and every
+	// recurring charge; fall back to the subscription row keyed by the first
+	// payment's InvId.
+	userID := res.UserID
+	if userID == 0 {
+		if sub, err := s.queries.GetSubscriptionByID(ctx, res.InvID); err == nil {
+			userID = sub.UserID
 		}
-		slog.Info("payments: pro activated via webhook", "user_id", sub.UserID, "subscription_id", sub.ID)
 	}
-	return nil
+	if userID == 0 {
+		return res.InvID, fmt.Errorf("payments: cannot resolve user for InvId %d", res.InvID)
+	}
+
+	// Idempotency gate: first delivery of this InvId returns 1, duplicates 0.
+	inserted, err := s.queries.RecordCharge(ctx, db.RecordChargeParams{
+		InvID: res.InvID, UserID: userID, Amount: amountToKopecks(res.OutSum),
+	})
+	if err != nil {
+		return res.InvID, fmt.Errorf("payments: record charge: %w", err)
+	}
+	if inserted == 0 {
+		slog.Info("payments: duplicate webhook ignored", "inv_id", res.InvID, "user_id", userID)
+		return res.InvID, nil
+	}
+
+	// First payment carries our subscription id as InvId — settle that row.
+	if sub, err := s.queries.GetSubscriptionByID(ctx, res.InvID); err == nil {
+		ref := strconv.FormatInt(res.InvID, 10)
+		if err := s.queries.MarkSubscriptionPaid(ctx, db.MarkSubscriptionPaidParams{
+			ID: sub.ID, ProviderOrderID: &ref,
+		}); err != nil {
+			slog.Warn("payments: mark subscription paid", "subscription_id", sub.ID, "error", err)
+		}
+	}
+
+	if _, err := s.queries.ActivatePro(ctx, userID); err != nil {
+		return res.InvID, fmt.Errorf("payments: activate pro: %w", err)
+	}
+	slog.Info("payments: pro extended via webhook", "user_id", userID, "inv_id", res.InvID, "amount", res.OutSum)
+	return res.InvID, nil
 }
 
 // ActivatePro is exported for the dev-only "Включить PRO" shortcut on Profile.
@@ -126,9 +125,11 @@ func (s *PaymentsService) ActivatePro(ctx context.Context, userID int64) error {
 	return nil
 }
 
-func optionalStr(s string) *string {
-	if s == "" {
-		return nil
+// amountToKopecks converts Robokassa's OutSum (e.g. "299.00") to integer kopecks.
+func amountToKopecks(outSum string) int32 {
+	f, err := strconv.ParseFloat(outSum, 64)
+	if err != nil {
+		return 0
 	}
-	return &s
+	return int32(f*100 + 0.5)
 }

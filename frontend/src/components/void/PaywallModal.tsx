@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -5,7 +6,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { haptic } from '@/lib/telegram';
+import { haptic, hapticNotification, openLink } from '@/lib/telegram';
+import { api } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaywallModalProps {
   open: boolean;
@@ -13,6 +16,24 @@ interface PaywallModalProps {
 }
 
 export function PaywallModal({ open, onClose }: PaywallModalProps) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const handleSubscribe = async () => {
+    haptic('medium');
+    setLoading(true);
+    try {
+      const res = await api.createPayment('monthly_pro');
+      openLink(res.payment_url);
+      onClose();
+    } catch {
+      hapticNotification('error');
+      toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="border-border bg-background max-w-sm">
@@ -21,19 +42,16 @@ export function PaywallModal({ open, onClose }: PaywallModalProps) {
             Вопросы закончились
           </DialogTitle>
           <DialogDescription className="text-[14px] leading-relaxed text-muted-foreground text-center pt-3">
-            Хочешь продолжить — пополни пакет вопросов.
+            Оформи PRO — 20 вопросов каждый месяц и весь Звёздник целиком.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 pt-4">
           <button
-            onClick={() => {
-              haptic('medium');
-              // TODO: integrate payment
-              onClose();
-            }}
-            className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors"
+            onClick={handleSubscribe}
+            disabled={loading}
+            className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors disabled:opacity-60"
           >
-            Купить 10 вопросов
+            {loading ? 'Открываем оплату…' : 'Подключить PRO · 299 ₽/мес'}
           </button>
           <button
             onClick={onClose}

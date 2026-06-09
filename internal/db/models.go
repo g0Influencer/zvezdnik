@@ -59,6 +59,13 @@ type NatalChart struct {
 	Summary         string          `json:"summary"`
 }
 
+type PaymentCharge struct {
+	InvID     int64     `json:"inv_id"`
+	UserID    int64     `json:"user_id"`
+	Amount    int32     `json:"amount"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Subscription struct {
 	ID              int64      `json:"id"`
 	UserID          int64      `json:"user_id"`

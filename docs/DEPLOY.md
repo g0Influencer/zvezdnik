@@ -161,15 +161,31 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f app
 ```
 
-## Payments (Prodamus) — wire when credentials arrive
+## Payments (Robokassa)
 
-In `.env.prod`:
+Recurring PRO subscription via Robokassa's native "Подписки": the first payment
+carries `Recurring=true`, then Robokassa auto-charges monthly. Each charge hits
+ResultURL and extends PRO 30 days (`ActivatePro`), idempotent per InvId.
+
+In `.env.prod` (creds from the cabinet: "Мои магазины" → shop → "Технические настройки"):
 ```
-PRODAMUS_SHOP_URL=https://<shop>.payform.ru
-PRODAMUS_SECRET_KEY=<secret>
+ROBOKASSA_MERCHANT_LOGIN=zvezdnik
+ROBOKASSA_PASSWORD1=<боевой #1>
+ROBOKASSA_PASSWORD2=<боевой #2>
+ROBOKASSA_TEST_PASSWORD1=<тестовый #1>
+ROBOKASSA_TEST_PASSWORD2=<тестовый #2>
+ROBOKASSA_IS_TEST=true        # flip to false for live
+ROBOKASSA_HASH_ALGO=md5       # must match the cabinet
+ROBOKASSA_FISCAL=true         # attach НПД receipt (tax "none")
 ```
-Register the webhook URL `https://zvezdnikbot.ru/payments/webhook` in the Prodamus
-admin panel, then `up -d` to restart `app`.
+
+In the cabinet set (method GET, hash MD5 — also for the test-payment block):
+- Result URL → `https://zvezdnikbot.ru/payments/webhook`
+- Success URL → `https://zvezdnikbot.ru/payment/success`
+- Fail URL → `https://zvezdnikbot.ru/payment/fail`
+
+Create the 299 ₽/month subscription plan under "Подписки" and confirm recurring
+is enabled. Then `up -d --build app web` to apply.
 
 ## Common issues
 

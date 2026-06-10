@@ -33,6 +33,7 @@ type Config struct {
 	RobokassaIsTest        bool
 	RobokassaHashAlgo      string
 	RobokassaFiscal        bool
+	RobokassaRecurring     bool
 
 	PushCron  string
 	TrialDays int
@@ -102,6 +103,7 @@ func Load() *Config {
 		RobokassaIsTest:        os.Getenv("ROBOKASSA_IS_TEST") == "true",
 		RobokassaHashAlgo:      getEnv("ROBOKASSA_HASH_ALGO", "md5"),
 		RobokassaFiscal:        os.Getenv("ROBOKASSA_FISCAL") == "true",
+		RobokassaRecurring:     os.Getenv("ROBOKASSA_RECURRING") != "false", // default on
 
 		PushCron:  getEnv("PUSH_CRON", "0 9 * * *"),
 		TrialDays: trialDays,

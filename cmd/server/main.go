@@ -97,7 +97,7 @@ func main() {
 		HashAlgo:      cfg.RobokassaHashAlgo,
 		Fiscal:        cfg.RobokassaFiscal,
 	})
-	paymentsSvc := service.NewPaymentsService(queries, robokassa)
+	paymentsSvc := service.NewPaymentsService(queries, robokassa, cfg.RobokassaRecurring)
 	compatibilitySvc := service.NewCompatibilityService(queries, llmClient)
 
 	// Init handlers

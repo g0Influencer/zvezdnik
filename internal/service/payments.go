@@ -31,12 +31,13 @@ var productCatalog = map[string]productSpec{
 }
 
 type PaymentsService struct {
-	queries *db.Queries
-	rk      *payments.Client
+	queries   *db.Queries
+	rk        *payments.Client
+	recurring bool // gate Recurring=true (Robokassa "Подписки" must be enabled)
 }
 
-func NewPaymentsService(queries *db.Queries, rk *payments.Client) *PaymentsService {
-	return &PaymentsService{queries: queries, rk: rk}
+func NewPaymentsService(queries *db.Queries, rk *payments.Client, recurring bool) *PaymentsService {
+	return &PaymentsService{queries: queries, rk: rk, recurring: recurring}
 }
 
 func (s *PaymentsService) CreatePayment(ctx context.Context, userID int64, req PaymentCreateRequest) (*PaymentCreateResponse, error) {
@@ -57,7 +58,7 @@ func (s *PaymentsService) CreatePayment(ctx context.Context, userID int64, req P
 		AmountRub:   spec.rubles,
 		Description: spec.displayName,
 		UserID:      userID,
-		Recurring:   spec.recurring,
+		Recurring:   spec.recurring && s.recurring,
 		Items:       []payments.ReceiptItem{{Name: spec.displayName, Quantity: 1, SumRub: spec.rubles}},
 	})
 	if err != nil {

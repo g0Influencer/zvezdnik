@@ -13,4 +13,5 @@ var (
 	ErrCompatibilityNoCredits    = errors.New("compatibility credits exhausted")
 	ErrVoidEntryNotFound         = errors.New("void entry not found")
 	ErrVoidNoCredits             = errors.New("void credits exhausted")
+	ErrConsentRequired           = errors.New("recurring-payment consent required")
 )

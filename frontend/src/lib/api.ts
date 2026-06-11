@@ -182,8 +182,8 @@ export const api = {
   }>) => request<{ user: UserProfile }>('PATCH', '/profile', data),
 
   // Payments
-  createPayment: (product: string) =>
-    request<PaymentResult>('POST', '/payments/create', { product }),
+  createPayment: (product: string, consent?: boolean) =>
+    request<PaymentResult>('POST', '/payments/create', { product, consent }),
 
   // Compatibility
   getCompatibilityCredits: () =>

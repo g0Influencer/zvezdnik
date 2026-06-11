@@ -16,3 +16,7 @@ WHERE id = $1 AND status <> 'paid';
 INSERT INTO payment_charges (inv_id, user_id, amount)
 VALUES ($1, $2, $3)
 ON CONFLICT (inv_id) DO NOTHING;
+
+-- name: RecordConsent :exec
+INSERT INTO recurring_consents (user_id, product, offer_url)
+VALUES ($1, $2, $3);

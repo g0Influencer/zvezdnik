@@ -84,3 +84,19 @@ func (q *Queries) RecordCharge(ctx context.Context, arg RecordChargeParams) (int
 	}
 	return result.RowsAffected(), nil
 }
+
+const recordConsent = `-- name: RecordConsent :exec
+INSERT INTO recurring_consents (user_id, product, offer_url)
+VALUES ($1, $2, $3)
+`
+
+type RecordConsentParams struct {
+	UserID   int64  `json:"user_id"`
+	Product  string `json:"product"`
+	OfferUrl string `json:"offer_url"`
+}
+
+func (q *Queries) RecordConsent(ctx context.Context, arg RecordConsentParams) error {
+	_, err := q.db.Exec(ctx, recordConsent, arg.UserID, arg.Product, arg.OfferUrl)
+	return err
+}

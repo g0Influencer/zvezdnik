@@ -10,6 +10,7 @@ import { useAppStore } from '@/lib/store';
 import { haptic, hapticNotification, openLink } from '@/lib/telegram';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { SubscriptionConsent } from '@/components/SubscriptionConsent';
 import { Button } from '@/components/ui/button';
 import { reachGoal } from '@/lib/metrika';
 import { getTipForDate, type DailyTip } from '@/lib/content/daily-tips-source';
@@ -47,6 +48,7 @@ export default function Today() {
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const [detailedOpen, setDetailedOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [consented, setConsented] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [freeUsage, setFreeUsage] = useState<DetailedFreeUsage>(() => readDetailedFreeUsage());
 
@@ -368,11 +370,15 @@ export default function Today() {
                 Ты уже прочитал(а) 4 бесплатных подробных разбора. Чтобы открывать детали каждый день, оформи
                 PRO-подписку — 299 ₽/мес.
               </p>
+              <div className="mb-4">
+                <SubscriptionConsent checked={consented} onChange={setConsented} />
+              </div>
               <button
                 onClick={async () => {
+                  if (!consented) return;
                   haptic('medium');
                   try {
-                    const res = await api.createPayment('monthly_pro');
+                    const res = await api.createPayment('monthly_pro', consented);
                     openLink(res.payment_url);
                     setPaywallOpen(false);
                   } catch {
@@ -380,7 +386,8 @@ export default function Today() {
                     toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
                   }
                 }}
-                className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors mb-3"
+                disabled={!consented}
+                className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors mb-3 disabled:opacity-60"
               >
                 Оформить PRO — 299 ₽/мес
               </button>

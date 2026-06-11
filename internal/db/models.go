@@ -66,6 +66,14 @@ type PaymentCharge struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type RecurringConsent struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Product     string    `json:"product"`
+	OfferUrl    string    `json:"offer_url"`
+	ConsentedAt time.Time `json:"consented_at"`
+}
+
 type Subscription struct {
 	ID              int64      `json:"id"`
 	UserID          int64      `json:"user_id"`

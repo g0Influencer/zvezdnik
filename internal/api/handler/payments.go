@@ -2,11 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"zvezdnik/internal/api/middleware"
+	"zvezdnik/internal/domain"
 	"zvezdnik/internal/httputil"
 	"zvezdnik/internal/service"
 )
@@ -33,12 +35,14 @@ func (h *PaymentsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.svc.CreatePayment(r.Context(), user.ID, req)
-	if err != nil {
+	switch {
+	case errors.Is(err, domain.ErrConsentRequired):
+		httputil.Error(w, http.StatusBadRequest, httputil.CodeInvalidRequest, "Нужно согласие на автосписания")
+	case err != nil:
 		httputil.InternalError(w, err)
-		return
+	default:
+		httputil.OK(w, result)
 	}
-
-	httputil.OK(w, result)
 }
 
 // Webhook handles Robokassa's ResultURL (configured in the cabinet). Robokassa

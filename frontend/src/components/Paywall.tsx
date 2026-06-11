@@ -5,6 +5,7 @@ import { haptic, hapticNotification, openLink } from '@/lib/telegram';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { MainScreenStarBackground } from '@/components/MainScreenStarBackground';
+import { SubscriptionConsent } from '@/components/SubscriptionConsent';
 
 type PaywallVariant = 'void' | 'longread';
 
@@ -25,6 +26,7 @@ const BENEFITS = [
 export function Paywall({ open, onClose }: PaywallProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [consented, setConsented] = useState(false);
 
   const handleClose = () => {
     haptic('light');
@@ -32,10 +34,11 @@ export function Paywall({ open, onClose }: PaywallProps) {
   };
 
   const handleSubscribe = async () => {
+    if (!consented) return;
     haptic('medium');
     setLoading(true);
     try {
-      const res = await api.createPayment('monthly_pro');
+      const res = await api.createPayment('monthly_pro', consented);
       openLink(res.payment_url);
       onClose();
     } catch {
@@ -136,9 +139,11 @@ export function Paywall({ open, onClose }: PaywallProps) {
                 </span>
               </div>
 
+              <SubscriptionConsent checked={consented} onChange={setConsented} />
+
               <button
                 onClick={handleSubscribe}
-                disabled={loading}
+                disabled={loading || !consented}
                 className="w-full py-4 text-[12px] font-semibold uppercase tracking-[0.3em] transition-opacity hover:opacity-90 disabled:opacity-60"
                 style={{ backgroundColor: 'hsl(0 0% 98%)', color: 'hsl(0 0% 4%)' }}
               >

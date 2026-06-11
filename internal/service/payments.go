@@ -8,11 +8,13 @@ import (
 	"strconv"
 
 	"zvezdnik/internal/db"
+	"zvezdnik/internal/domain"
 	"zvezdnik/internal/payments"
 )
 
 type PaymentCreateRequest struct {
 	Product string `json:"product"`
+	Consent bool   `json:"consent"` // user ticked the recurring-charge consent box
 }
 
 type PaymentCreateResponse struct {
@@ -33,17 +35,31 @@ var productCatalog = map[string]productSpec{
 type PaymentsService struct {
 	queries   *db.Queries
 	rk        *payments.Client
-	recurring bool // gate Recurring=true (Robokassa "Подписки" must be enabled)
+	recurring bool   // gate Recurring=true (Robokassa "Подписки" must be enabled)
+	offerURL  string // recorded with each recurring-payment consent
 }
 
-func NewPaymentsService(queries *db.Queries, rk *payments.Client, recurring bool) *PaymentsService {
-	return &PaymentsService{queries: queries, rk: rk, recurring: recurring}
+func NewPaymentsService(queries *db.Queries, rk *payments.Client, recurring bool, offerURL string) *PaymentsService {
+	return &PaymentsService{queries: queries, rk: rk, recurring: recurring, offerURL: offerURL}
 }
 
 func (s *PaymentsService) CreatePayment(ctx context.Context, userID int64, req PaymentCreateRequest) (*PaymentCreateResponse, error) {
 	spec, ok := productCatalog[req.Product]
 	if !ok {
 		return nil, fmt.Errorf("payments: unknown product: %s", req.Product)
+	}
+
+	// Subscription products require explicit consent to recurring charges; record
+	// it for Robokassa compliance and dispute protection before taking payment.
+	if spec.recurring {
+		if !req.Consent {
+			return nil, domain.ErrConsentRequired
+		}
+		if err := s.queries.RecordConsent(ctx, db.RecordConsentParams{
+			UserID: userID, Product: req.Product, OfferUrl: s.offerURL,
+		}); err != nil {
+			return nil, fmt.Errorf("payments: record consent: %w", err)
+		}
 	}
 
 	subID, err := s.queries.CreateSubscription(ctx, db.CreateSubscriptionParams{

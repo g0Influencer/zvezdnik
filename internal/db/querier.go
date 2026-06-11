@@ -35,6 +35,7 @@ type Querier interface {
 	MarkSubscriptionPaid(ctx context.Context, arg MarkSubscriptionPaidParams) error
 	// Returns 1 when this InvId is new (apply PRO), 0 when it's a duplicate delivery.
 	RecordCharge(ctx context.Context, arg RecordChargeParams) (int64, error)
+	RecordConsent(ctx context.Context, arg RecordConsentParams) error
 	RefreshCompatibilityCredits(ctx context.Context, arg RefreshCompatibilityCreditsParams) error
 	RefreshVoidCredits(ctx context.Context, arg RefreshVoidCreditsParams) error
 	UpdateNatalChartPortrait(ctx context.Context, arg UpdateNatalChartPortraitParams) error

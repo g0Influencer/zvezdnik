@@ -25,10 +25,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { BottomNav } from '@/components/BottomNav';
+import { Paywall } from '@/components/Paywall';
 import { useAppStore } from '@/lib/store';
 import { getZodiacSign, STYLE_LABELS } from '@/lib/zodiac';
 import { api } from '@/lib/api';
-import { haptic, hapticNotification, openLink } from '@/lib/telegram';
+import { haptic, hapticNotification } from '@/lib/telegram';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { AREAS } from '@/lib/onboarding-config';
@@ -44,6 +45,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [parsingSheets, setParsingSheets] = useState(false);
@@ -115,14 +117,9 @@ export default function Profile() {
       toast({ title: 'PRO активирован' });
       return;
     }
+    // Prod: open the full paywall, which carries the recurring-consent checkbox.
     haptic('medium');
-    try {
-      const res = await api.createPayment('monthly_pro');
-      openLink(res.payment_url);
-    } catch {
-      hapticNotification('error');
-      toast({ title: 'Не удалось открыть оплату', variant: 'destructive' });
-    }
+    setPaywallOpen(true);
   };
 
   const handleCancelPro = async () => {
@@ -423,6 +420,8 @@ export default function Profile() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Paywall open={paywallOpen} onClose={() => setPaywallOpen(false)} />
 
       <BottomNav />
     </div>

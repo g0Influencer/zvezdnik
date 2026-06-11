@@ -184,7 +184,7 @@ In the cabinet set (method GET, hash MD5 — also for the test-payment block):
 - Success URL → `https://zvezdnikbot.ru/payment/success`
 - Fail URL → `https://zvezdnikbot.ru/payment/fail`
 
-Create the 299 ₽/month subscription plan under "Подписки" and confirm recurring
+Create the 199 ₽/month subscription plan under "Подписки" and confirm recurring
 is enabled. Then `up -d --build app web` to apply.
 
 ## Common issues

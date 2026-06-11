@@ -17,7 +17,7 @@ export function SubscriptionConsent({ checked, onChange }: SubscriptionConsentPr
         className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-foreground"
       />
       <span className="text-[11px] leading-[1.5] text-muted-foreground">
-        Я согласен на автоматические ежемесячные списания 299&nbsp;₽ согласно{' '}
+        Я согласен на автоматические ежемесячные списания 199&nbsp;₽ согласно{' '}
         <button
           type="button"
           onClick={() => openLink(`${window.location.origin}/oferta`)}

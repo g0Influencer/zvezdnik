@@ -135,7 +135,7 @@ export function Paywall({ open, onClose }: PaywallProps) {
                   className="text-[15px]"
                   style={{ color: 'hsl(0 0% 98%)', fontVariantNumeric: 'tabular-nums' }}
                 >
-                  299 ₽
+                  199 ₽
                 </span>
               </div>
 

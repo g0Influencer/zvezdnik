@@ -368,7 +368,7 @@ export default function Today() {
               </h3>
               <p className="text-[14px] leading-relaxed text-muted-foreground text-center mb-8">
                 Ты уже прочитал(а) 4 бесплатных подробных разбора. Чтобы открывать детали каждый день, оформи
-                PRO-подписку — 299 ₽/мес.
+                PRO-подписку — 199 ₽/мес.
               </p>
               <div className="mb-4">
                 <SubscriptionConsent checked={consented} onChange={setConsented} />
@@ -389,7 +389,7 @@ export default function Today() {
                 disabled={!consented}
                 className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors mb-3 disabled:opacity-60"
               >
-                Оформить PRO — 299 ₽/мес
+                Оформить PRO — 199 ₽/мес
               </button>
               <button
                 onClick={() => setPaywallOpen(false)}

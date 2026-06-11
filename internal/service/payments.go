@@ -29,7 +29,7 @@ type productSpec struct {
 }
 
 var productCatalog = map[string]productSpec{
-	"monthly_pro": {displayName: "Звёздник PRO — подписка на месяц", rubles: 299, recurring: true},
+	"monthly_pro": {displayName: "Звёздник PRO — подписка на месяц", rubles: 199, recurring: true},
 }
 
 type PaymentsService struct {
@@ -142,7 +142,7 @@ func (s *PaymentsService) ActivatePro(ctx context.Context, userID int64) error {
 	return nil
 }
 
-// amountToKopecks converts Robokassa's OutSum (e.g. "299.00") to integer kopecks.
+// amountToKopecks converts Robokassa's OutSum (e.g. "199.00") to integer kopecks.
 func amountToKopecks(outSum string) int32 {
 	f, err := strconv.ParseFloat(outSum, 64)
 	if err != nil {

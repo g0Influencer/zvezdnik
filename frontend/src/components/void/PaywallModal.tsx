@@ -55,7 +55,7 @@ export function PaywallModal({ open, onClose }: PaywallModalProps) {
             disabled={loading || !consented}
             className="w-full bg-foreground text-background text-[11px] font-semibold uppercase tracking-[0.25em] py-4 hover:bg-foreground/90 transition-colors disabled:opacity-60"
           >
-            {loading ? 'Открываем оплату…' : 'Подключить PRO · 299 ₽/мес'}
+            {loading ? 'Открываем оплату…' : 'Подключить PRO · 199 ₽/мес'}
           </button>
           <button
             onClick={onClose}

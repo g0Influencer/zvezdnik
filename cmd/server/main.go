@@ -161,7 +161,7 @@ func main() {
 	// does not drive these; we initiate each child charge ourselves. The 23h
 	// per-subscription guard in the query keeps it to one attempt per day.
 	if cfg.RobokassaRecurring {
-		if _, err := c.AddFunc("0 */6 * * *", func() {
+		if _, err := c.AddFunc(cfg.RobokassaRecurringCron, func() {
 			recCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
 			if err := paymentsSvc.ChargeDueRecurring(recCtx); err != nil {

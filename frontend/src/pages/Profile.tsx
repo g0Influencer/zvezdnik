@@ -319,6 +319,30 @@ export default function Profile() {
             </a>
           </div>
 
+          {/* Документы */}
+          <div className="rounded-2xl border border-border bg-card p-4 mb-6">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">Документы</p>
+            <div className="flex flex-col">
+              {[
+                { href: 'https://zvezdnikbot.ru/oferta', label: 'Публичная оферта' },
+                { href: 'https://zvezdnikbot.ru/privacy', label: 'Политика конфиденциальности' },
+                { href: 'https://zvezdnikbot.ru/terms', label: 'Пользовательское соглашение' },
+                { href: 'https://zvezdnikbot.ru/consent', label: 'Согласие на обработку данных' },
+              ].map((doc) => (
+                <a
+                  key={doc.href}
+                  href={doc.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => haptic('light')}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1.5"
+                >
+                  {doc.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
           {/* Personalization */}
           <div className="rounded-2xl border border-border bg-card p-4 mb-6">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">

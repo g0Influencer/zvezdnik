@@ -45,6 +45,21 @@ func (h *PaymentsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Cancel stops future recurring charges for the user. PRO access remains until
+// the end of the already-paid period.
+func (h *PaymentsHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUser(r.Context())
+	if user == nil {
+		httputil.Error(w, http.StatusUnauthorized, httputil.CodeOnboardingRequired, "Необходимо пройти онбординг")
+		return
+	}
+	if err := h.svc.CancelSubscription(r.Context(), user.ID); err != nil {
+		httputil.InternalError(w, err)
+		return
+	}
+	httputil.OK(w, map[string]bool{"cancelled": true})
+}
+
 // Webhook handles Robokassa's ResultURL (configured in the cabinet). Robokassa
 // may call it via GET or POST, so we read the merged form. On success we MUST
 // reply with the exact body "OK<InvId>" or Robokassa keeps retrying.

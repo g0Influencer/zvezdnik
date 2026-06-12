@@ -156,6 +156,22 @@ func main() {
 		slog.Error("failed to setup cron", "error", err)
 		os.Exit(1)
 	}
+
+	// Recurring (API-recurring) charge scheduler — only when enabled. Robokassa
+	// does not drive these; we initiate each child charge ourselves. The 23h
+	// per-subscription guard in the query keeps it to one attempt per day.
+	if cfg.RobokassaRecurring {
+		if _, err := c.AddFunc("0 */6 * * *", func() {
+			recCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			if err := paymentsSvc.ChargeDueRecurring(recCtx); err != nil {
+				slog.Error("recurring charge cron failed", "error", err)
+			}
+		}); err != nil {
+			slog.Error("failed to setup recurring cron", "error", err)
+		}
+	}
+
 	c.Start()
 	defer c.Stop()
 

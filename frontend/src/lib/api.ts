@@ -184,6 +184,8 @@ export const api = {
   // Payments
   createPayment: (product: string, consent?: boolean) =>
     request<PaymentResult>('POST', '/payments/create', { product, consent }),
+  cancelSubscription: () =>
+    request<{ cancelled: boolean }>('POST', '/payments/cancel', {}),
 
   // Compatibility
   getCompatibilityCredits: () =>

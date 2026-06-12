@@ -7,7 +7,65 @@ package db
 
 import (
 	"context"
+	"time"
 )
+
+const advanceRecurringSubscription = `-- name: AdvanceRecurringSubscription :exec
+UPDATE recurring_subscriptions
+SET next_charge_at = $2, failed_attempts = 0, last_attempt_at = NOW(), updated_at = NOW()
+WHERE id = $1
+`
+
+type AdvanceRecurringSubscriptionParams struct {
+	ID           int64     `json:"id"`
+	NextChargeAt time.Time `json:"next_charge_at"`
+}
+
+func (q *Queries) AdvanceRecurringSubscription(ctx context.Context, arg AdvanceRecurringSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, advanceRecurringSubscription, arg.ID, arg.NextChargeAt)
+	return err
+}
+
+const cancelRecurringByUser = `-- name: CancelRecurringByUser :exec
+UPDATE recurring_subscriptions SET status = 'cancelled', updated_at = NOW()
+WHERE user_id = $1 AND status = 'active'
+`
+
+func (q *Queries) CancelRecurringByUser(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, cancelRecurringByUser, userID)
+	return err
+}
+
+const cancelRecurringSubscription = `-- name: CancelRecurringSubscription :exec
+UPDATE recurring_subscriptions SET status = 'cancelled', updated_at = NOW() WHERE id = $1
+`
+
+func (q *Queries) CancelRecurringSubscription(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, cancelRecurringSubscription, id)
+	return err
+}
+
+const createRecurringSubscription = `-- name: CreateRecurringSubscription :exec
+INSERT INTO recurring_subscriptions (user_id, mother_inv_id, amount, next_charge_at)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreateRecurringSubscriptionParams struct {
+	UserID       int64     `json:"user_id"`
+	MotherInvID  int64     `json:"mother_inv_id"`
+	Amount       int32     `json:"amount"`
+	NextChargeAt time.Time `json:"next_charge_at"`
+}
+
+func (q *Queries) CreateRecurringSubscription(ctx context.Context, arg CreateRecurringSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, createRecurringSubscription,
+		arg.UserID,
+		arg.MotherInvID,
+		arg.Amount,
+		arg.NextChargeAt,
+	)
+	return err
+}
 
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (user_id, type, amount)
@@ -28,6 +86,28 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 	return id, err
 }
 
+const getActiveRecurringByUser = `-- name: GetActiveRecurringByUser :one
+SELECT id, user_id, mother_inv_id, amount, status, next_charge_at, last_attempt_at, failed_attempts, created_at, updated_at FROM recurring_subscriptions WHERE user_id = $1 AND status = 'active'
+`
+
+func (q *Queries) GetActiveRecurringByUser(ctx context.Context, userID int64) (RecurringSubscription, error) {
+	row := q.db.QueryRow(ctx, getActiveRecurringByUser, userID)
+	var i RecurringSubscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MotherInvID,
+		&i.Amount,
+		&i.Status,
+		&i.NextChargeAt,
+		&i.LastAttemptAt,
+		&i.FailedAttempts,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
 SELECT id, user_id, type, amount, status, provider_order_id, created_at, paid_at FROM subscriptions WHERE id = $1
 `
@@ -46,6 +126,54 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id int64) (Subscripti
 		&i.PaidAt,
 	)
 	return i, err
+}
+
+const listDueRecurring = `-- name: ListDueRecurring :many
+SELECT id, user_id, mother_inv_id, amount, status, next_charge_at, last_attempt_at, failed_attempts, created_at, updated_at FROM recurring_subscriptions
+WHERE status = 'active' AND next_charge_at <= NOW()
+  AND (last_attempt_at IS NULL OR last_attempt_at < NOW() - INTERVAL '23 hours')
+`
+
+func (q *Queries) ListDueRecurring(ctx context.Context) ([]RecurringSubscription, error) {
+	rows, err := q.db.Query(ctx, listDueRecurring)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RecurringSubscription
+	for rows.Next() {
+		var i RecurringSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MotherInvID,
+			&i.Amount,
+			&i.Status,
+			&i.NextChargeAt,
+			&i.LastAttemptAt,
+			&i.FailedAttempts,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markRecurringAttempt = `-- name: MarkRecurringAttempt :exec
+UPDATE recurring_subscriptions
+SET last_attempt_at = NOW(), failed_attempts = failed_attempts + 1, updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) MarkRecurringAttempt(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, markRecurringAttempt, id)
+	return err
 }
 
 const markSubscriptionPaid = `-- name: MarkSubscriptionPaid :exec

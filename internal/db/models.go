@@ -74,6 +74,19 @@ type RecurringConsent struct {
 	ConsentedAt time.Time `json:"consented_at"`
 }
 
+type RecurringSubscription struct {
+	ID             int64      `json:"id"`
+	UserID         int64      `json:"user_id"`
+	MotherInvID    int64      `json:"mother_inv_id"`
+	Amount         int32      `json:"amount"`
+	Status         string     `json:"status"`
+	NextChargeAt   time.Time  `json:"next_charge_at"`
+	LastAttemptAt  *time.Time `json:"last_attempt_at"`
+	FailedAttempts int32      `json:"failed_attempts"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
 type Subscription struct {
 	ID              int64      `json:"id"`
 	UserID          int64      `json:"user_id"`

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 	"strconv"
+	"time"
 
 	"zvezdnik/internal/db"
 	"zvezdnik/internal/domain"
@@ -31,6 +32,12 @@ type productSpec struct {
 var productCatalog = map[string]productSpec{
 	"monthly_pro": {displayName: "Звёздник PRO — подписка на месяц", rubles: 199, recurring: true},
 }
+
+const (
+	recurringProduct     = "monthly_pro"
+	recurringPeriod      = 30 * 24 * time.Hour
+	maxRecurringAttempts = 3 // daily retries before a failing subscription is cancelled
+)
 
 type PaymentsService struct {
 	queries   *db.Queries
@@ -117,8 +124,11 @@ func (s *PaymentsService) HandleWebhook(ctx context.Context, values url.Values) 
 		return res.InvID, nil
 	}
 
-	// First payment carries our subscription id as InvId — settle that row.
+	// First/child payment carries a subscriptions row id as InvId — settle that
+	// row and learn the product type to manage the recurring schedule below.
+	var productType string
 	if sub, err := s.queries.GetSubscriptionByID(ctx, res.InvID); err == nil {
+		productType = sub.Type
 		ref := strconv.FormatInt(res.InvID, 10)
 		if err := s.queries.MarkSubscriptionPaid(ctx, db.MarkSubscriptionPaidParams{
 			ID: sub.ID, ProviderOrderID: &ref,
@@ -130,8 +140,88 @@ func (s *PaymentsService) HandleWebhook(ctx context.Context, values url.Values) 
 	if _, err := s.queries.ActivatePro(ctx, userID); err != nil {
 		return res.InvID, fmt.Errorf("payments: activate pro: %w", err)
 	}
+
+	// For subscription products, (re)establish the recurring schedule: the mother
+	// charge creates the record; every charge pushes the next charge date out.
+	if spec, ok := productCatalog[productType]; ok && spec.recurring && s.recurring {
+		s.recordRecurringCharge(ctx, userID, res.InvID, amountToKopecks(res.OutSum))
+	}
+
 	slog.Info("payments: pro extended via webhook", "user_id", userID, "inv_id", res.InvID, "amount", res.OutSum)
 	return res.InvID, nil
+}
+
+// recordRecurringCharge creates the recurring subscription on the mother charge
+// or pushes the next charge date out on subsequent charges. Best-effort.
+func (s *PaymentsService) recordRecurringCharge(ctx context.Context, userID, invID int64, amountKopecks int32) {
+	next := time.Now().Add(recurringPeriod)
+	existing, err := s.queries.GetActiveRecurringByUser(ctx, userID)
+	if err == nil {
+		if e := s.queries.AdvanceRecurringSubscription(ctx, db.AdvanceRecurringSubscriptionParams{ID: existing.ID, NextChargeAt: next}); e != nil {
+			slog.Warn("payments: advance recurring", "user_id", userID, "error", e)
+		}
+		return
+	}
+	if !db.IsNotFound(err) {
+		slog.Warn("payments: load recurring", "user_id", userID, "error", err)
+		return
+	}
+	// No active subscription yet — this is the mother charge.
+	if e := s.queries.CreateRecurringSubscription(ctx, db.CreateRecurringSubscriptionParams{
+		UserID: userID, MotherInvID: invID, Amount: amountKopecks, NextChargeAt: next,
+	}); e != nil {
+		slog.Warn("payments: create recurring", "user_id", userID, "error", e)
+	}
+}
+
+// ChargeDueRecurring charges every subscription whose next charge date has passed.
+// We initiate each child charge ourselves; the outcome returns via the webhook,
+// which pushes next_charge_at out on success or leaves it due for the next retry.
+func (s *PaymentsService) ChargeDueRecurring(ctx context.Context) error {
+	due, err := s.queries.ListDueRecurring(ctx)
+	if err != nil {
+		return fmt.Errorf("payments: list due recurring: %w", err)
+	}
+	if len(due) > 0 {
+		slog.Info("recurring: due subscriptions", "count", len(due))
+	}
+	for _, sub := range due {
+		if sub.FailedAttempts >= maxRecurringAttempts {
+			if e := s.queries.CancelRecurringSubscription(ctx, sub.ID); e != nil {
+				slog.Warn("recurring: cancel exhausted", "id", sub.ID, "error", e)
+			}
+			slog.Info("recurring: cancelled after failed attempts", "id", sub.ID, "user_id", sub.UserID)
+			continue
+		}
+		// Mark the attempt up front so a slow webhook can't cause a double charge.
+		if e := s.queries.MarkRecurringAttempt(ctx, sub.ID); e != nil {
+			slog.Warn("recurring: mark attempt", "id", sub.ID, "error", e)
+			continue
+		}
+		// Each child charge needs its own InvId — reuse a subscriptions row.
+		childInvID, e := s.queries.CreateSubscription(ctx, db.CreateSubscriptionParams{
+			UserID: sub.UserID, Type: recurringProduct, Amount: sub.Amount,
+		})
+		if e != nil {
+			slog.Error("recurring: create child subscription", "id", sub.ID, "error", e)
+			continue
+		}
+		if e := s.rk.ChargeRecurring(ctx, childInvID, sub.MotherInvID, float64(sub.Amount)/100, sub.UserID); e != nil {
+			slog.Error("recurring: charge failed", "id", sub.ID, "user_id", sub.UserID, "child_inv", childInvID, "error", e)
+			continue
+		}
+		slog.Info("recurring: child charge sent", "id", sub.ID, "user_id", sub.UserID, "child_inv", childInvID)
+	}
+	return nil
+}
+
+// CancelSubscription stops future recurring charges for the user. Access remains
+// until the end of the already-paid period (sub_ends_at).
+func (s *PaymentsService) CancelSubscription(ctx context.Context, userID int64) error {
+	if err := s.queries.CancelRecurringByUser(ctx, userID); err != nil {
+		return fmt.Errorf("payments: cancel subscription: %w", err)
+	}
+	return nil
 }
 
 // ActivatePro is exported for the dev-only "Включить PRO" shortcut on Profile.

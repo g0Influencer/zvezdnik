@@ -11,6 +11,7 @@
 package payments
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -19,13 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash"
+	"io"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-const indexURL = "https://auth.robokassa.ru/Merchant/Index.aspx"
+const (
+	indexURL     = "https://auth.robokassa.ru/Merchant/Index.aspx"
+	recurringURL = "https://auth.robokassa.ru/Merchant/Recurring"
+)
 
 type Config struct {
 	MerchantLogin string
@@ -186,6 +192,54 @@ func (c *Client) VerifyResult(values url.Values) (*Result, error) {
 		res.UserID, _ = strconv.ParseInt(v, 10, 64)
 	}
 	return res, nil
+}
+
+// ChargeRecurring initiates a child (recurring) charge against a previously
+// authorized "mother" payment referenced by motherInvID (PreviousInvoiceID).
+// Signature is the standard init form over the CHILD InvId; PreviousInvoiceID is
+// excluded from it, and Recurring/IncCurrLabel/ExpirationDate must not be sent.
+// The final outcome arrives via ResultURL; an error here means the request was
+// not accepted by Robokassa.
+func (c *Client) ChargeRecurring(ctx context.Context, childInvID, motherInvID int64, amountRub float64, userID int64) error {
+	if !c.Configured() {
+		return fmt.Errorf("robokassa: not configured")
+	}
+	outSum := formatSum(amountRub)
+
+	shp := map[string]string{}
+	if userID > 0 {
+		shp["Shp_userId"] = strconv.FormatInt(userID, 10)
+	}
+	parts := append([]string{c.cfg.MerchantLogin, outSum, strconv.FormatInt(childInvID, 10), c.password1()}, shpPairs(shp)...)
+	sig := c.hash(strings.Join(parts, ":"))
+
+	form := url.Values{}
+	form.Set("MerchantLogin", c.cfg.MerchantLogin)
+	form.Set("InvoiceID", strconv.FormatInt(childInvID, 10))
+	form.Set("PreviousInvoiceID", strconv.FormatInt(motherInvID, 10))
+	form.Set("OutSum", outSum)
+	form.Set("Description", "Звёздник PRO — продление подписки")
+	for k, v := range shp {
+		form.Set(k, v)
+	}
+	form.Set("SignatureValue", sig)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, recurringURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("robokassa: build recurring request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("robokassa: recurring request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("robokassa: recurring http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
 }
 
 // shpPairs renders Shp_ params as "key=value" sorted by key — the form Robokassa

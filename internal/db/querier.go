@@ -11,11 +11,16 @@ import (
 
 type Querier interface {
 	ActivatePro(ctx context.Context, id int64) (User, error)
+	AdvanceRecurringSubscription(ctx context.Context, arg AdvanceRecurringSubscriptionParams) error
 	CancelPro(ctx context.Context, id int64) error
+	CancelRecurringByUser(ctx context.Context, userID int64) error
+	CancelRecurringSubscription(ctx context.Context, id int64) error
+	CreateRecurringSubscription(ctx context.Context, arg CreateRecurringSubscriptionParams) error
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (int64, error)
 	DecrementCompatibilityCredits(ctx context.Context, userID int64) error
 	DecrementVoidCredits(ctx context.Context, userID int64) error
 	DeleteVoidEntry(ctx context.Context, arg DeleteVoidEntryParams) error
+	GetActiveRecurringByUser(ctx context.Context, userID int64) (RecurringSubscription, error)
 	GetCompatibilityCard(ctx context.Context, arg GetCompatibilityCardParams) (CompatibilityCard, error)
 	GetCompatibilityCredits(ctx context.Context, userID int64) (GetCompatibilityCreditsRow, error)
 	GetDailyContentByDate(ctx context.Context, date time.Time) (DailyContent, error)
@@ -30,8 +35,10 @@ type Querier interface {
 	InsertVoidCredits(ctx context.Context, arg InsertVoidCreditsParams) error
 	InsertVoidEntry(ctx context.Context, arg InsertVoidEntryParams) (VoidHistory, error)
 	ListCompatibilityCards(ctx context.Context, arg ListCompatibilityCardsParams) ([]ListCompatibilityCardsRow, error)
+	ListDueRecurring(ctx context.Context) ([]RecurringSubscription, error)
 	ListPushEnabledUsers(ctx context.Context) ([]User, error)
 	ListVoidHistory(ctx context.Context, arg ListVoidHistoryParams) ([]VoidHistory, error)
+	MarkRecurringAttempt(ctx context.Context, id int64) error
 	MarkSubscriptionPaid(ctx context.Context, arg MarkSubscriptionPaidParams) error
 	// Returns 1 when this InvId is new (apply PRO), 0 when it's a duplicate delivery.
 	RecordCharge(ctx context.Context, arg RecordChargeParams) (int64, error)

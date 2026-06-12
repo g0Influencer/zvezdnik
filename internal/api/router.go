@@ -61,6 +61,7 @@ func NewRouter(
 		r.Get("/profile", profile.GetProfile)
 		r.Patch("/profile", profile.UpdateProfile)
 		r.Post("/payments/create", payments.Create)
+		r.Post("/payments/cancel", payments.Cancel)
 
 		r.Get("/compatibility/credits", compatibility.GetCredits)
 		r.Get("/compatibility", compatibility.GetHistory)

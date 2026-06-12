@@ -124,8 +124,22 @@ export default function Profile() {
 
   const handleCancelPro = async () => {
     setCancelOpen(false);
-    await updateField('pro_status', 'free');
-    toast({ title: 'Подписка отменена' });
+    // Dev shortcut: revoke PRO directly for testing.
+    if (import.meta.env.DEV) {
+      await updateField('pro_status', 'free');
+      toast({ title: 'Подписка отменена' });
+      return;
+    }
+    try {
+      await api.cancelSubscription();
+      toast({
+        title: 'Подписка отменена',
+        description: 'Доступ к PRO сохранится до конца оплаченного периода.',
+      });
+    } catch {
+      hapticNotification('error');
+      toast({ title: 'Не удалось отменить', variant: 'destructive' });
+    }
   };
 
   useEffect(() => {
@@ -412,7 +426,7 @@ export default function Profile() {
         <AlertDialogContent className="border-border bg-background max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Отменить PRO-подписку?</AlertDialogTitle>
-            <AlertDialogDescription>Доступ к платным функциям будет закрыт сразу.</AlertDialogDescription>
+            <AlertDialogDescription>Новые списания прекратятся. Доступ к PRO сохранится до конца оплаченного периода.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Назад</AlertDialogCancel>

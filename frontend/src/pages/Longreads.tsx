@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
-import { NatalChartArt } from "@/components/NatalChartArt";
+import { InteractiveNatalChart } from "@/components/InteractiveNatalChart";
 import { LongreadRevealAnimation } from "@/components/LongreadRevealAnimation";
 import { useAppStore } from "@/lib/store";
 import { api } from "@/lib/api";
@@ -339,20 +339,7 @@ export default function LongreadsPage() {
                   <p className="text-[12px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-6">
                     Бесплатный лонгрид
                   </p>
-                  <div className="mb-8 flex justify-center">
-                    <NatalChartArt birthDate={user?.birth_date} className="w-full max-w-[340px] h-auto" />
-                  </div>
-                  <div className="space-y-4">
-                    {renderLongreadBody(openTopic.body, {
-                      name: user?.display_name,
-                      sign: user?.birth_date ? getZodiacSign(user.birth_date).name : "",
-                      symbol: user?.birth_date ? getZodiacSign(user.birth_date).symbol : "",
-                    }).map((paragraph, i) => (
-                      <p key={i} className="text-[15px] leading-[1.75] text-foreground/90">
-                        {paragraph}
-                      </p>
-                    ))}
-                  </div>
+                  <InteractiveNatalChart birthDate={user?.birth_date} name={user?.display_name} />
                 </>
               ) : (
                 (() => {

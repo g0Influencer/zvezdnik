@@ -221,7 +221,7 @@ export default function Profile() {
           </div>
 
           {/* Subscription */}
-          <div className="rounded-2xl border border-border bg-card p-4 mb-2">
+          <div className="rounded-2xl border border-border bg-card p-4 mb-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Подписка</p>
@@ -252,9 +252,6 @@ export default function Profile() {
               )}
             </div>
           </div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70 mb-6 px-1">
-            Тестовый режим. Реальная оплата появится позже.
-          </p>
 
           {/* Style */}
           <div className="mb-6">

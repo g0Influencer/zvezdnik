@@ -7,6 +7,7 @@ import { ChatThread } from '@/components/void/ChatThread';
 import { InputBar } from '@/components/void/InputBar';
 import { PaywallModal } from '@/components/void/PaywallModal';
 import { VoidHistory } from '@/components/void/VoidHistory';
+import { VoidOnboardingOverlay, useVoidOnboarding } from '@/components/void/VoidOnboarding';
 import { api, VoidEntry } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +26,7 @@ export default function Void() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<VoidEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { hasSeen: hasSeenOnboarding, dismiss: dismissOnboarding } = useVoidOnboarding();
 
   const loadHistory = () => {
     api.getVoidHistory()
@@ -151,6 +153,8 @@ export default function Void() {
         items={history}
         onSelect={handleHistorySelect}
       />
+
+      {!hasSeenOnboarding && <VoidOnboardingOverlay onDismiss={dismissOnboarding} />}
     </div>
   );
 }

@@ -15,7 +15,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background">
-      <div className="mx-auto flex max-w-md items-center justify-between px-3 py-3 pb-8">
+      <div className="mx-auto flex max-w-md items-end justify-between px-3 py-3 pb-8">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
           return (
@@ -26,11 +26,12 @@ export function BottomNav() {
                 navigate(tab.path);
               }}
               className={cn(
-                'py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground'
+                'flex flex-col items-center py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-colors',
+                isActive ? 'text-foreground font-semibold' : 'text-muted-foreground'
               )}
             >
               {tab.label}
+              {isActive && <span className="mt-1.5 h-[2px] w-5 rounded-full bg-foreground" />}
             </button>
           );
         })}

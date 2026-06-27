@@ -332,35 +332,103 @@ export default function LongreadsPage() {
 
             {/* Article body */}
             <article className="px-5 pt-6 pb-32 max-w-2xl mx-auto">
-              <div className="text-3xl mb-3">{openTopic.emoji}</div>
-              <h2 className="text-[22px] leading-tight font-medium text-foreground mb-2">{openTopic.title}</h2>
-              <p className="text-[12px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-6">
-                Бесплатный лонгрид
-              </p>
-
               {openTopic.id === "natal-chart" ? (
-                <div className="mb-8 flex justify-center">
-                  <NatalChartArt birthDate={user?.birth_date} className="w-full max-w-[340px] h-auto" />
-                </div>
-              ) : openTopic.image ? (
-                <img
-                  src={openTopic.image}
-                  alt={openTopic.title}
-                  className="block w-full max-w-sm mx-auto rounded-lg border border-border mb-6"
-                />
-              ) : null}
-
-              <div className="space-y-4">
-                {renderLongreadBody(openTopic.body, {
-                  name: user?.display_name,
-                  sign: user?.birth_date ? getZodiacSign(user.birth_date).name : "",
-                  symbol: user?.birth_date ? getZodiacSign(user.birth_date).symbol : "",
-                }).map((paragraph, i) => (
-                  <p key={i} className="text-[15px] leading-[1.75] text-foreground/90">
-                    {paragraph}
+                <>
+                  <div className="text-3xl mb-3">{openTopic.emoji}</div>
+                  <h2 className="text-[22px] leading-tight font-medium text-foreground mb-2">{openTopic.title}</h2>
+                  <p className="text-[12px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-6">
+                    Бесплатный лонгрид
                   </p>
-                ))}
-              </div>
+                  <div className="mb-8 flex justify-center">
+                    <NatalChartArt birthDate={user?.birth_date} className="w-full max-w-[340px] h-auto" />
+                  </div>
+                  <div className="space-y-4">
+                    {renderLongreadBody(openTopic.body, {
+                      name: user?.display_name,
+                      sign: user?.birth_date ? getZodiacSign(user.birth_date).name : "",
+                      symbol: user?.birth_date ? getZodiacSign(user.birth_date).symbol : "",
+                    }).map((paragraph, i) => (
+                      <p key={i} className="text-[15px] leading-[1.75] text-foreground/90">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                (() => {
+                  const paragraphs = renderLongreadBody(openTopic.body, {
+                    name: user?.display_name,
+                    sign: user?.birth_date ? getZodiacSign(user.birth_date).name : "",
+                    symbol: user?.birth_date ? getZodiacSign(user.birth_date).symbol : "",
+                  });
+                  const [lead, ...rest] = paragraphs;
+                  const middle = rest.slice(0, Math.max(0, rest.length - 1));
+                  const closing = rest.length > 0 ? rest[rest.length - 1] : null;
+                  return (
+                    <>
+                      {/* Eyebrow */}
+                      <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-muted-foreground/80 mb-4">
+                        {openTopic.proOnly ? "Лонгрид · Pro" : "Лонгрид"}
+                      </p>
+
+                      {/* Hero mark */}
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="text-4xl leading-none">{openTopic.emoji}</div>
+                        <div className="h-px flex-1 bg-foreground/15" />
+                      </div>
+
+                      {/* Title */}
+                      <h2 className="font-serif text-[30px] leading-[1.15] text-foreground mb-3 tracking-tight">
+                        {openTopic.title}
+                      </h2>
+                      <p className="text-[13px] leading-relaxed text-muted-foreground mb-10 max-w-[44ch]">
+                        {openTopic.description}
+                      </p>
+
+                      {openTopic.image ? (
+                        <img
+                          src={openTopic.image}
+                          alt={openTopic.title}
+                          className="block w-full max-w-sm mx-auto rounded-lg border border-border mb-8"
+                        />
+                      ) : null}
+
+                      {/* Lead paragraph */}
+                      {lead && (
+                        <p className="font-serif text-[19px] leading-[1.55] text-foreground mb-10">
+                          {lead}
+                        </p>
+                      )}
+
+                      {/* Body */}
+                      <div className="space-y-7">
+                        {middle.map((paragraph, i) => (
+                          <p key={i} className="text-[15.5px] leading-[1.78] text-foreground/90">
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+
+                      {/* Closing */}
+                      {closing && (
+                        <div className="mt-12 pt-8 border-t border-foreground/15">
+                          <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-muted-foreground mb-3">
+                            И в завершение
+                          </p>
+                          <p className="font-serif italic text-[17px] leading-[1.6] text-foreground/90">
+                            {closing}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* End mark */}
+                      <div className="mt-12 flex justify-center">
+                        <span className="text-muted-foreground/40 tracking-[1em] text-[10px]">— ✦ —</span>
+                      </div>
+                    </>
+                  );
+                })()
+              )}
             </article>
           </motion.div>
         )}

@@ -127,6 +127,14 @@ func (b *Bot) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ignore non-text updates (service messages, web-app data, the events Telegram
+	// emits when a user opens/restarts the bot). They must not hit handleDefault,
+	// which would otherwise post a spurious second "open the app" block.
+	if update.Message.Text == "" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	switch update.Message.Text {
 	case "/start":
 		b.handleStart(r.Context(), update.Message)

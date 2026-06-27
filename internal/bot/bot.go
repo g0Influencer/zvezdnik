@@ -155,9 +155,10 @@ func (b *Bot) handleStart(ctx context.Context, msg *Message) {
 		slog.Error("bot: handle /start", "chat_id", msg.Chat.ID, "error", err)
 	}
 
-	// Surface the public offer + supplier details and pin them, so the
-	// payment-provider requirement (legal info available in the bot) is met.
-	if b.legal.configured() {
+	// Pin the supplier requisites + public offer once per chat (payment-provider
+	// requirement: legal info available in the bot). Skip if the chat already has
+	// a pinned message, so repeated /start commands don't re-post it.
+	if b.legal.configured() && !b.chatHasPinnedMessage(ctx, msg.Chat.ID) {
 		msgID, err := b.sendMessageReturningID(ctx, sendMessageRequest{
 			ChatID:    msg.Chat.ID,
 			Text:      b.legalText(),
@@ -171,6 +172,40 @@ func (b *Bot) handleStart(ctx context.Context, msg *Message) {
 			slog.Warn("bot: pin legal message", "chat_id", msg.Chat.ID, "error", err)
 		}
 	}
+}
+
+// chatHasPinnedMessage reports whether the chat already has a pinned message.
+// Used to pin the legal block only once. On any error it returns false (so we
+// fall back to pinning), which is safe for a compliance message.
+func (b *Bot) chatHasPinnedMessage(ctx context.Context, chatID int64) bool {
+	payload, _ := json.Marshal(map[string]int64{"chat_id": chatID})
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/getChat", b.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := b.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+
+	var result struct {
+		Result struct {
+			PinnedMessage *struct {
+				MessageID int64 `json:"message_id"`
+			} `json:"pinned_message"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false
+	}
+	return result.Result.PinnedMessage != nil
 }
 
 func (b *Bot) handleOferta(ctx context.Context, msg *Message) {

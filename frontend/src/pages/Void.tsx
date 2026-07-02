@@ -39,6 +39,15 @@ export default function Void() {
 
   useEffect(() => {
     loadHistory();
+    // Longreads (InteractiveNatalChart) hand off a suggested question via
+    // sessionStorage — prefill the input so the user lands ready to send.
+    try {
+      const prefill = sessionStorage.getItem('void_prefill');
+      if (prefill) {
+        setInput(prefill);
+        sessionStorage.removeItem('void_prefill');
+      }
+    } catch { /* noop */ }
   }, []);
 
   const handleSend = async () => {

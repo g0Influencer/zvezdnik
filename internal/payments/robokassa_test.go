@@ -92,14 +92,19 @@ func TestReceiptEmbedding(t *testing.T) {
 	rj, _ := buildReceiptJSON(inv.Items)
 	receiptEnc := url.QueryEscape(rj)
 
-	// The Receipt must be present single-encoded (not re-escaped by url.Values).
-	if !strings.Contains(u, "&Receipt="+receiptEnc) {
-		t.Fatalf("URL missing single-encoded Receipt\nurl: %s", u)
+	// The GET link must carry the Receipt double-encoded: one query decode on
+	// Robokassa's side has to recover the exact once-encoded string we signed.
+	if !strings.Contains(u, "&Receipt="+url.QueryEscape(receiptEnc)) {
+		t.Fatalf("URL missing double-encoded Receipt\nurl: %s", u)
 	}
-	// ...and that exact encoded string must be the one folded into the signature.
+	// The signature is folded over the once-encoded value.
 	want := md5hex("demo:299.00:42:" + receiptEnc + ":pass1:Shp_userId=7")
 	parsed, _ := url.Parse(u)
 	if got := parsed.Query().Get("SignatureValue"); got != want {
 		t.Fatalf("SignatureValue = %q, want %q", got, want)
+	}
+	// Sanity: a single query decode of the Receipt param yields the signed string.
+	if got := parsed.Query().Get("Receipt"); got != receiptEnc {
+		t.Fatalf("decoded Receipt param = %q, want once-encoded %q", got, receiptEnc)
 	}
 }

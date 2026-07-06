@@ -6,8 +6,10 @@
 //	init     : MerchantLogin:OutSum:InvId[:Receipt]:Password#1[:Shp_k=v ...]
 //	ResultURL: OutSum:InvId:Password#2[:Shp_k=v ...]
 //
-// Receipt is URL-encoded once; the same encoded string is signed and sent. Shp_
-// params are appended after the password, sorted by key.
+// Receipt handling (per Robokassa fiscalization docs): the signature is computed
+// over the URL-encoded (once) receipt JSON, while the GET link carries it encoded
+// twice — Robokassa decodes the query once and must recover the exact string that
+// was signed. Shp_ params are appended after the password, sorted by key.
 package payments
 
 import (
@@ -144,8 +146,9 @@ func (c *Client) PaymentURL(inv Invoice) (string, error) {
 
 	raw := q.Encode()
 	if receiptEnc != "" {
-		// Append the already-encoded Receipt verbatim so it matches what we signed.
-		raw += "&Receipt=" + receiptEnc
+		// GET link: encode the (already once-encoded, signed) Receipt a second
+		// time — Robokassa's single query decode must yield the signed string.
+		raw += "&Receipt=" + url.QueryEscape(receiptEnc)
 	}
 	return indexURL + "?" + raw, nil
 }
@@ -206,11 +209,27 @@ func (c *Client) ChargeRecurring(ctx context.Context, childInvID, motherInvID in
 	}
 	outSum := formatSum(amountRub)
 
+	const childDesc = "Звёздник PRO — продление подписки"
+
 	shp := map[string]string{}
 	if userID > 0 {
 		shp["Shp_userId"] = strconv.FormatInt(userID, 10)
 	}
-	parts := append([]string{c.cfg.MerchantLogin, outSum, strconv.FormatInt(childInvID, 10), c.password1()}, shpPairs(shp)...)
+
+	parts := []string{c.cfg.MerchantLogin, outSum, strconv.FormatInt(childInvID, 10)}
+	var receiptEnc string
+	if c.cfg.Fiscal {
+		j, err := buildReceiptJSON([]ReceiptItem{{Name: childDesc, Quantity: 1, SumRub: amountRub}})
+		if err != nil {
+			return err
+		}
+		// POST form: sign the once-encoded value and send that same string as the
+		// field value — the form transport encoding is decoded back by Robokassa.
+		receiptEnc = url.QueryEscape(j)
+		parts = append(parts, receiptEnc)
+	}
+	parts = append(parts, c.password1())
+	parts = append(parts, shpPairs(shp)...)
 	sig := c.hash(strings.Join(parts, ":"))
 
 	form := url.Values{}
@@ -218,7 +237,10 @@ func (c *Client) ChargeRecurring(ctx context.Context, childInvID, motherInvID in
 	form.Set("InvoiceID", strconv.FormatInt(childInvID, 10))
 	form.Set("PreviousInvoiceID", strconv.FormatInt(motherInvID, 10))
 	form.Set("OutSum", outSum)
-	form.Set("Description", "Звёздник PRO — продление подписки")
+	form.Set("Description", childDesc)
+	if receiptEnc != "" {
+		form.Set("Receipt", receiptEnc)
+	}
 	for k, v := range shp {
 		form.Set(k, v)
 	}

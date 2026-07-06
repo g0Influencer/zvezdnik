@@ -2,11 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { tg } from "@/lib/telegram";
 import { useAppStore } from "@/lib/store";
 import { api } from "@/lib/api";
+import { trackPageview, reachGoal } from "@/lib/metrika";
+import { PENDING_PAYMENT_KEY } from "@/lib/checkout";
 import Welcome from "./pages/Welcome";
 
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -20,6 +22,21 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
+// Sends an SPA "hit" to Metrika on every route change. The initial pageview is
+// already counted by the counter init, so the first render is skipped.
+function MetrikaTracker() {
+  const location = useLocation();
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    trackPageview(location.pathname + location.search);
+  }, [location.pathname, location.search]);
+  return null;
+}
+
 function AppRoutes() {
   const { isOnboarded, setOnboarded } = useAppStore();
   const [authChecked, setAuthChecked] = useState(false);
@@ -29,6 +46,14 @@ function AppRoutes() {
       .then((profile) => {
         useAppStore.getState().setUser(profile);
         setOnboarded(true);
+        // Pending-payment flag + PRO now active = the checkout the user left
+        // for has completed; count the subscription exactly once.
+        try {
+          if (profile.pro_status === 'active' && localStorage.getItem(PENDING_PAYMENT_KEY)) {
+            localStorage.removeItem(PENDING_PAYMENT_KEY);
+            reachGoal('subscription_activated');
+          }
+        } catch { /* noop */ }
       })
       .catch((err: Error & { code?: string }) => {
         if (err.code === 'NOT_FOUND' || err.code === 'UNAUTHORIZED' || err.code === 'ONBOARDING_REQUIRED') {
@@ -70,6 +95,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <MetrikaTracker />
           <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { haptic, hapticNotification, openLink } from '@/lib/telegram';
-import { api } from '@/lib/api';
+import { haptic, hapticNotification } from '@/lib/telegram';
+import { startProCheckout } from '@/lib/checkout';
 import { useToast } from '@/hooks/use-toast';
 import { MainScreenStarBackground } from '@/components/MainScreenStarBackground';
 import { SubscriptionConsent } from '@/components/SubscriptionConsent';
@@ -38,8 +38,7 @@ export function Paywall({ open, onClose }: PaywallProps) {
     haptic('medium');
     setLoading(true);
     try {
-      const res = await api.createPayment('monthly_pro', consented);
-      openLink(res.payment_url);
+      await startProCheckout(consented);
       onClose();
     } catch {
       hapticNotification('error');

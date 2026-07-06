@@ -10,6 +10,7 @@ import { VoidHistory } from '@/components/void/VoidHistory';
 import { VoidOnboardingOverlay, useVoidOnboarding } from '@/components/void/VoidOnboarding';
 import { api, VoidEntry } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { reachGoal } from '@/lib/metrika';
 
 interface ChatMessage {
   role: 'user' | 'void';
@@ -39,6 +40,7 @@ export default function Void() {
 
   useEffect(() => {
     loadHistory();
+    reachGoal('universe_open');
     // Longreads (InteractiveNatalChart) hand off a suggested question via
     // sessionStorage — prefill the input so the user lands ready to send.
     try {
@@ -67,6 +69,7 @@ export default function Void() {
       const res = await api.askVoid(question);
       setMessages((prev) => [...prev, { role: 'void', text: res.entry.answer }]);
       setRemaining(res.remaining);
+      reachGoal('universe_question_submit');
       loadHistory();
     } catch (e: any) {
       if (e.code === 'PRO_REQUIRED') {

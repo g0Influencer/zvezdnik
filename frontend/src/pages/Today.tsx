@@ -7,8 +7,8 @@ import { BottomNav } from '@/components/BottomNav';
 import { MainScreenStarBackground } from '@/components/MainScreenStarBackground';
 import { DayPicker, formatSelectedDateLabel } from '@/components/DayPicker';
 import { useAppStore } from '@/lib/store';
-import { haptic, hapticNotification, openLink } from '@/lib/telegram';
-import { api } from '@/lib/api';
+import { haptic, hapticNotification } from '@/lib/telegram';
+import { startProCheckout } from '@/lib/checkout';
 import { useToast } from '@/hooks/use-toast';
 import { SubscriptionConsent } from '@/components/SubscriptionConsent';
 import { Button } from '@/components/ui/button';
@@ -378,8 +378,7 @@ export default function Today() {
                   if (!consented) return;
                   haptic('medium');
                   try {
-                    const res = await api.createPayment('monthly_pro', consented);
-                    openLink(res.payment_url);
+                    await startProCheckout(consented);
                     setPaywallOpen(false);
                   } catch {
                     hapticNotification('error');

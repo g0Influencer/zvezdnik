@@ -25,7 +25,10 @@ export type MetrikaGoal =
   | 'longread_natal_chart_open'
   | 'longread_inner_resource_open'
   | 'paywall_open'
-  | 'subscription_activated';
+  | 'payment_open'
+  | 'subscription_activated'
+  | 'natal_ask_void'
+  | 'natal_open_compatibility';
 
 /**
  * Injects the Yandex.Metrika tag.js loader and initializes the counter.
@@ -67,6 +70,18 @@ export function initMetrika(): void {
     accurateTrackBounce: true,
     trackLinks: true,
   });
+}
+
+/**
+ * SPA route-change hit so Metrika sees in-app navigation and correct page
+ * reports — otherwise every visit collapses into the single entry URL.
+ */
+export function trackPageview(url: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (typeof window.ym !== 'function') return;
+    window.ym(COUNTER_ID, 'hit', url);
+  } catch { /* noop */ }
 }
 
 export function reachGoal(goal: MetrikaGoal | string, params?: Record<string, unknown>): void {

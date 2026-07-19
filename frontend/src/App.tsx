@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ComponentType } from "react";
 import { tg } from "@/lib/telegram";
 import { useAppStore } from "@/lib/store";
 import { api } from "@/lib/api";
@@ -11,14 +11,31 @@ import { trackPageview, reachGoal } from "@/lib/metrika";
 import { PENDING_PAYMENT_KEY } from "@/lib/checkout";
 import Welcome from "./pages/Welcome";
 
-const Onboarding = lazy(() => import("./pages/Onboarding"));
-const Today = lazy(() => import("./pages/Today"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Chart = lazy(() => import("./pages/Chart"));
-const Void = lazy(() => import("./pages/Void"));
-const Compatibility = lazy(() => import("./pages/Compatibility"));
-const Longreads = lazy(() => import("./pages/Longreads"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+// Wraps lazy() so a failed chunk load (stale cached index after a redeploy)
+// reloads the page once to fetch the fresh bundle instead of rendering blank.
+function lazyWithReload(importer: () => Promise<{ default: ComponentType }>) {
+  return lazy(() =>
+    importer().catch((err) => {
+      try {
+        if (!sessionStorage.getItem("chunk-reload")) {
+          sessionStorage.setItem("chunk-reload", "1");
+          window.location.reload();
+          return new Promise<{ default: ComponentType }>(() => {});
+        }
+      } catch { /* noop */ }
+      throw err;
+    })
+  );
+}
+
+const Onboarding = lazyWithReload(() => import("./pages/Onboarding"));
+const Today = lazyWithReload(() => import("./pages/Today"));
+const Profile = lazyWithReload(() => import("./pages/Profile"));
+const Chart = lazyWithReload(() => import("./pages/Chart"));
+const Void = lazyWithReload(() => import("./pages/Void"));
+const Compatibility = lazyWithReload(() => import("./pages/Compatibility"));
+const Longreads = lazyWithReload(() => import("./pages/Longreads"));
+const NotFound = lazyWithReload(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 

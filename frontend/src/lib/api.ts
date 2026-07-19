@@ -15,6 +15,8 @@ export interface UserProfile {
   pro_status: 'free' | 'active' | 'expired';
   pro_activated_at: string | null;
   trial_ends_at: string | null;
+  sub_ends_at: string | null;
+  recurring_active?: boolean;
   push_enabled: boolean;
 }
 

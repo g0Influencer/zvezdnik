@@ -165,6 +165,13 @@ func (h *ProfileHandler) buildProfile(ctx context.Context, user *domain.User) (m
 		displayName = *user.DisplayName
 	}
 
+	// Whether an active recurring subscription exists — the UI needs it to
+	// distinguish "renews on X" from "cancelled, PRO until X".
+	recurringActive := false
+	if _, err := h.queries.GetActiveRecurringByUser(ctx, user.ID); err == nil {
+		recurringActive = true
+	}
+
 	return map[string]interface{}{
 		"display_name":     displayName,
 		"sun_sign":         sunSign,
@@ -178,6 +185,8 @@ func (h *ProfileHandler) buildProfile(ctx context.Context, user *domain.User) (m
 		"pro_status":       user.ProStatus,
 		"pro_activated_at": user.ProActivatedAt,
 		"trial_ends_at":    user.TrialEndsAt,
+		"sub_ends_at":      user.SubEndsAt,
+		"recurring_active": recurringActive,
 		"push_enabled":     user.PushEnabled,
 	}, nil
 }

@@ -132,6 +132,7 @@ export default function Profile() {
     }
     try {
       await api.cancelSubscription();
+      setUser({ ...user!, recurring_active: false });
       toast({
         title: 'Подписка отменена',
         description: 'Доступ к PRO сохранится до конца оплаченного периода.',
@@ -182,16 +183,13 @@ export default function Profile() {
   const personalization = user.personalization as Record<string, unknown> | null;
   const selectedAreas = (personalization?.selectedAreas as string[]) || [];
   const isPro = user.pro_status === 'active';
-  const nextBilling = (() => {
-    if (!isPro || !user.pro_activated_at) return null;
-    const start = new Date(user.pro_activated_at);
-    if (Number.isNaN(start.getTime())) return null;
-    const next = new Date(start);
-    const today = new Date();
-    while (next <= today) {
-      next.setMonth(next.getMonth() + 1);
-    }
-    return next;
+  const recurringActive = !!user.recurring_active;
+  // End of the paid period: the next charge date while recurring is on, or the
+  // access-until date after cancellation.
+  const periodEnd = (() => {
+    if (!isPro || !user.sub_ends_at) return null;
+    const d = new Date(user.sub_ends_at);
+    return Number.isNaN(d.getTime()) ? null : d;
   })();
 
   return (
@@ -226,25 +224,29 @@ export default function Profile() {
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Подписка</p>
                 <p className="font-display font-semibold mt-0.5">{isPro ? 'PRO ⭐' : 'FREE'}</p>
-                {isPro && nextBilling && (
+                {isPro && periodEnd && (
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    Следующее списание {format(nextBilling, 'd MMMM yyyy', { locale: ru })}
+                    {recurringActive
+                      ? `Следующее списание ${format(periodEnd, 'd MMMM yyyy', { locale: ru })}`
+                      : `Активна до ${format(periodEnd, 'd MMMM yyyy', { locale: ru })} · автопродление отключено`}
                   </p>
                 )}
               </div>
               {isPro ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-lg"
-                  onClick={() => {
-                    haptic('light');
-                    setCancelOpen(true);
-                  }}
-                  disabled={saving}
-                >
-                  Отменить подписку
-                </Button>
+                recurringActive && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg"
+                    onClick={() => {
+                      haptic('light');
+                      setCancelOpen(true);
+                    }}
+                    disabled={saving}
+                  >
+                    Отменить подписку
+                  </Button>
+                )
               ) : (
                 <Button size="sm" className="rounded-lg" onClick={handleEnablePro} disabled={saving}>
                   Включить PRO

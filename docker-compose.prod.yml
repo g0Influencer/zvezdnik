@@ -27,6 +27,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env.prod
+    # Telegram's API pool is partially blocked from this network: DNS resolves
+    # api.telegram.org to an unreachable address while one IP still answers.
+    # Pin the resolve to a working one; override via TELEGRAM_API_IP when it
+    # changes (verify with: curl --resolve api.telegram.org:443:<ip> .../getMe).
+    extra_hosts:
+      - "api.telegram.org:${TELEGRAM_API_IP:-149.154.167.220}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,6 +40,11 @@ services:
         condition: service_started
     expose:
       - "8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     build:
@@ -51,6 +62,11 @@ services:
       - certbot-www:/var/www/certbot
     depends_on:
       - app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # One-off certbot — run manually to obtain/renew certificates:
   #   docker compose -f docker-compose.prod.yml run --rm certbot certonly \

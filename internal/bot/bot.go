@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type Bot struct {
@@ -37,7 +38,9 @@ func NewBot(token, miniAppURL string, legal LegalInfo) *Bot {
 		token:      token,
 		miniAppURL: miniAppURL,
 		legal:      legal,
-		httpClient: &http.Client{},
+		// Bounded timeout: without it a blocked route stalls every call on the
+		// OS-level TCP timeout (~30s), which serialises the daily broadcast.
+		httpClient: &http.Client{Timeout: 15 * time.Second},
 	}
 }
 

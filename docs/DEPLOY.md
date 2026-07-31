@@ -197,5 +197,22 @@ is enabled. Then `up -d --build app web` to apply.
   fallback; test inside Telegram (step 7).
 - **Bot webhook last_error "SSL"** — cert not trusted/incomplete; ensure `fullchain.pem`
   (not just `cert.pem`) is referenced (it is, in `nginx/nginx.conf`).
+- **Bot silent, pushes fail with `dial tcp 149.154.x.x:443: i/o timeout`** — Telegram's
+  API pool is partially blocked from this network (July 2026: only `149.154.167.220`
+  answered). `compose` pins `api.telegram.org` for the `app` container via
+  `extra_hosts` (`TELEGRAM_API_IP`, default `149.154.167.220`). When that IP is blocked
+  too, find a live one and override:
+  ```
+  for ip in 149.154.167.220 149.154.175.50 91.108.56.130 149.154.167.51; do
+    echo -n "$ip: "; timeout 5 bash -c "</dev/tcp/$ip/443" 2>/dev/null && echo OK || echo BLOCKED
+  done
+  # verify it really serves the API:
+  TOKEN=$(grep '^TELEGRAM_BOT_TOKEN=' .env.prod | cut -d= -f2)
+  curl -s -m 10 --resolve api.telegram.org:443:<ip> "https://api.telegram.org/bot$TOKEN/getMe"
+  # then: put TELEGRAM_API_IP=<ip> in .env.prod and
+  dc up -d --force-recreate app
+  ```
+  If every IP is blocked, the fallback is an outbound proxy (cheap non-RU VPS) —
+  add proxy support to the bot's HTTP client.
 </content>
 </invoke>

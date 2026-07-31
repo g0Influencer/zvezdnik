@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -12,6 +13,10 @@ import (
 const (
 	fallbackPushTitle = "Звёздник: твой день готов 🌙"
 	pushButtonLabel   = "Подробнее"
+	// Abort the broadcast after this many consecutive failures: when Telegram is
+	// unreachable every send burns the full HTTP timeout, so pushing on would
+	// stall for minutes without delivering anything.
+	maxConsecutiveSendFailures = 3
 )
 
 type PushScheduler struct {
@@ -38,6 +43,7 @@ func (ps *PushScheduler) SendDailyPushes(ctx context.Context) error {
 
 	slog.Info("sending daily pushes", "user_count", len(users), "date", today, "have_tip", tip != nil)
 
+	sent, failures := 0, 0
 	for _, user := range users {
 		title := fallbackPushTitle
 		var shortDesc string
@@ -56,15 +62,23 @@ func (ps *PushScheduler) SendDailyPushes(ctx context.Context) error {
 		}
 
 		if err := ps.bot.SendMessageWithMiniAppButton(ctx, user.TelegramUserID, text, pushButtonLabel); err != nil {
+			failures++
 			slog.Error("daily push: send failed",
 				"user_id", user.ID,
 				"telegram_user_id", user.TelegramUserID,
 				"error", err,
 			)
+			if failures >= maxConsecutiveSendFailures {
+				slog.Error("daily push: aborting broadcast, Telegram unreachable",
+					"consecutive_failures", failures, "sent", sent, "total", len(users))
+				return fmt.Errorf("daily push: aborted after %d consecutive failures", failures)
+			}
 			continue
 		}
+		failures = 0
+		sent++
 	}
 
-	slog.Info("daily pushes sent", "user_count", len(users))
+	slog.Info("daily pushes sent", "sent", sent, "user_count", len(users))
 	return nil
 }

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -13,9 +14,10 @@ import (
 const (
 	fallbackPushTitle = "Звёздник: твой день готов 🌙"
 	pushButtonLabel   = "Подробнее"
-	// Abort the broadcast after this many consecutive failures: when Telegram is
-	// unreachable every send burns the full HTTP timeout, so pushing on would
-	// stall for minutes without delivering anything.
+	// Abort the broadcast after this many consecutive *connectivity* failures:
+	// when Telegram is unreachable every send burns the full HTTP timeout, so
+	// pushing on would stall for minutes without delivering anything. Per-user
+	// API rejections (blocked bot, missing chat) never count toward this.
 	maxConsecutiveSendFailures = 3
 )
 
@@ -62,6 +64,26 @@ func (ps *PushScheduler) SendDailyPushes(ctx context.Context) error {
 		}
 
 		if err := ps.bot.SendMessageWithMiniAppButton(ctx, user.TelegramUserID, text, pushButtonLabel); err != nil {
+			// A rejection by the API concerns this user only — Telegram itself is
+			// reachable, so keep the broadcast going.
+			var apiErr *APIError
+			if errors.As(err, &apiErr) {
+				if apiErr.Unreachable() {
+					// Blocked bot / deleted chat: stop pushing to them for good.
+					if e := ps.queries.UpdateUserPushEnabled(ctx, db.UpdateUserPushEnabledParams{
+						ID: user.ID, PushEnabled: false,
+					}); e != nil {
+						slog.Warn("daily push: failed to disable pushes", "user_id", user.ID, "error", e)
+					}
+					slog.Info("daily push: user unreachable, pushes disabled",
+						"user_id", user.ID, "status", apiErr.StatusCode)
+				} else {
+					slog.Error("daily push: send rejected",
+						"user_id", user.ID, "status", apiErr.StatusCode, "error", err)
+				}
+				continue
+			}
+
 			failures++
 			slog.Error("daily push: send failed",
 				"user_id", user.ID,

@@ -68,6 +68,25 @@ type From struct {
 	Username  string `json:"username"`
 }
 
+// APIError is a non-2xx reply from the Telegram Bot API. It marks a per-request
+// problem (user blocked the bot, chat is gone, rate limit) as opposed to a
+// connectivity failure, so callers can skip that user instead of assuming
+// Telegram is unreachable.
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("telegram api error: %d", e.StatusCode)
+}
+
+// Unreachable reports whether this user can never be messaged again as-is:
+// they blocked the bot (403) or the chat no longer exists (400).
+func (e *APIError) Unreachable() bool {
+	return e.StatusCode == http.StatusForbidden || e.StatusCode == http.StatusBadRequest
+}
+
 type sendMessageRequest struct {
 	ChatID      int64       `json:"chat_id"`
 	Text        string      `json:"text"`
@@ -326,7 +345,7 @@ func (b *Bot) sendMessageReturningID(ctx context.Context, msg sendMessageRequest
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		slog.Error("telegram api error", "status", resp.StatusCode, "body", string(respBody))
-		return 0, fmt.Errorf("telegram api error: %d", resp.StatusCode)
+		return 0, &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	var result struct {

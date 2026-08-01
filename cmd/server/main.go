@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,6 +31,11 @@ import (
 )
 
 func main() {
+	// One-off daily push, e.g. after a failed scheduled run:
+	//   docker compose ... exec app ./zvezdnik -push-now
+	pushNow := flag.Bool("push-now", false, "send the daily push once and exit")
+	flag.Parse()
+
 	cfg := config.Load()
 
 	// Setup structured logging
@@ -142,6 +148,17 @@ func main() {
 	// Init push scheduler
 	tipsClient := content.NewDailyTipsClient(cfg.SheetsSpreadsheetID)
 	pushScheduler := bot.NewPushScheduler(tgBot, queries, tipsClient)
+
+	if *pushNow {
+		pushCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		if err := pushScheduler.SendDailyPushes(pushCtx); err != nil {
+			slog.Error("manual push failed", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("manual push finished")
+		return
+	}
 
 	// Setup cron for daily pushes
 	c := cron.New(cron.WithLocation(time.FixedZone("MSK", 3*60*60)))

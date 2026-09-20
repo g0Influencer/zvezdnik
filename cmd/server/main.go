@@ -111,7 +111,7 @@ func main() {
 	todayH := handler.NewTodayHandler(todaySvc)
 	voidH := handler.NewVoidHandler(voidSvc)
 	chartH := handler.NewChartHandler(chartSvc)
-	profileH := handler.NewProfileHandler(queries)
+	profileH := handler.NewProfileHandler(queries, cfg.Env == "development")
 	paymentsH := handler.NewPaymentsHandler(paymentsSvc)
 	compatibilityH := handler.NewCompatibilityHandler(compatibilitySvc)
 

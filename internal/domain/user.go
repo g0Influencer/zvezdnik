@@ -18,6 +18,20 @@ type TelegramUser struct {
 	FirstName string `json:"first_name"`
 }
 
+// EffectiveProStatus is what the client should be told, as opposed to the raw
+// column. A lapsed subscriber keeps pro_status='active' in the database —
+// nothing ever rewrites it — so the raw value would unlock the UI for someone
+// the API then refuses. Derive it from the same rule the API gates on.
+func EffectiveProStatus(u *User) string {
+	if IsPro(u) {
+		return ProStatusActive
+	}
+	if u != nil && (u.ProStatus == ProStatusActive || u.ProStatus == ProStatusExpired) {
+		return ProStatusExpired
+	}
+	return ProStatusFree
+}
+
 func IsPro(u *User) bool {
 	if u == nil {
 		return false

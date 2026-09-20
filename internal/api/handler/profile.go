@@ -17,10 +17,14 @@ import (
 
 type ProfileHandler struct {
 	queries *db.Queries
+	devMode bool
 }
 
-func NewProfileHandler(queries *db.Queries) *ProfileHandler {
-	return &ProfileHandler{queries: queries}
+// NewProfileHandler wires the profile endpoints. devMode enables the local
+// testing shortcut that flips pro_status without paying; it must stay off
+// outside development.
+func NewProfileHandler(queries *db.Queries, devMode bool) *ProfileHandler {
+	return &ProfileHandler{queries: queries, devMode: devMode}
 }
 
 type profileUpdateRequest struct {
@@ -88,6 +92,14 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.ProStatus != nil {
+		// PRO is granted by the payment flow, never by the client. The UI only
+		// sends this from a DEV-only shortcut, but that check lives in the
+		// browser, so without this guard any authenticated user could PATCH
+		// themselves 30 days of PRO.
+		if !h.devMode {
+			httputil.Error(w, http.StatusForbidden, httputil.CodeInvalidRequest, "pro_status изменяется только через оплату")
+			return
+		}
 		switch *req.ProStatus {
 		case domain.ProStatusActive:
 			if _, err := h.queries.ActivatePro(r.Context(), user.ID); err != nil {
@@ -182,7 +194,7 @@ func (h *ProfileHandler) buildProfile(ctx context.Context, user *domain.User) (m
 		"style":            user.Style,
 		"focus":            user.Focus,
 		"personalization":  json.RawMessage(user.Personalization),
-		"pro_status":       user.ProStatus,
+		"pro_status":       domain.EffectiveProStatus(user),
 		"pro_activated_at": user.ProActivatedAt,
 		"trial_ends_at":    user.TrialEndsAt,
 		"sub_ends_at":      user.SubEndsAt,

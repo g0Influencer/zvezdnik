@@ -106,10 +106,37 @@ Open `https://zvezdnikbot.ru` in a browser — valid padlock, frontend loads.
 
 `app` auto-registers the webhook on startup because `WEBHOOK_BASE_URL` is set.
 
+The host cannot query `api.telegram.org` directly — it resolves to IPv6 only and
+the VM has no IPv6 route — so ask from a container, where the IPv4 pin applies:
+
 ```bash
-curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+H="--add-host api.telegram.org:149.154.167.220"
+```
+```bash
+docker run --rm $H curlimages/curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 # url should be https://zvezdnikbot.ru/bot/webhook, pending_update_count low, no last_error
 ```
+
+### When the webhook times out: switch to polling
+
+`last_error_message: "Connection timed out"` with a `last_error_date` that keeps
+advancing means Telegram cannot reach this host at all. Seen on 2026-09-20:
+inbound from Telegram to the VM was filtered while outbound calls kept working
+(the daily broadcast went out normally). An expired TLS cert looks different —
+it reports an SSL error, not a timeout.
+
+Polling uses only the outbound direction. Set it in `.env.prod` and rebuild:
+
+```bash
+TELEGRAM_MODE=polling
+```
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build app
+```
+
+Expect `telegram webhook deleted` then `telegram polling started` in the app log;
+`/start` in the bot should answer within a second. Switching back is the reverse
+— `TELEGRAM_MODE=webhook` and rebuild, which re-registers the webhook on boot.
 
 ---
 
@@ -128,14 +155,48 @@ With real Telegram `initData`, auth succeeds (no more 401). Walk Today / Longrea
 sudo ufw delete allow 8081
 
 # Certificate auto-renewal (Let's Encrypt certs last 90 days).
-# Add a root cron entry — renews then reloads nginx in the running container:
+# Use the WEBROOT method, not --standalone: nginx holds port 80, so a standalone
+# renew can never bind it and fails every time (this is what let the first cert
+# lapse on 2026-08-27). The certbot-www volume is already wired into compose and
+# served at /.well-known/acme-challenge/, so renewal needs no downtime.
 sudo crontab -e
-# 0 3 * * * docker run --rm -p 80:80 -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot renew --standalone --quiet && docker compose --env-file /home/kirill/zvezdnik/.env.prod -f /home/kirill/zvezdnik/docker-compose.prod.yml exec web nginx -s reload
+# 17 3,15 * * * docker run --rm -v /etc/letsencrypt:/etc/letsencrypt -v zvezdnik_certbot-www:/var/www/certbot certbot/certbot renew --quiet && docker compose --env-file /home/kirill/zvezdnik/.env.prod -f /home/kirill/zvezdnik/docker-compose.prod.yml exec -T web nginx -s reload >> /var/log/certbot-renew.log 2>&1
 ```
 
-> Note: standalone renew needs port 80 free for a moment. Alternative: switch to the
-> webroot method using the `certbot-www` volume already wired into the compose file
-> (`location /.well-known/acme-challenge/` is served from `/var/www/certbot`).
+> Twice daily is the Let's Encrypt recommendation; `renew` is a no-op until the
+> cert is within 30 days of expiry. `exec -T` is required — cron has no tty and
+> the reload silently fails without it.
+
+### Renewing by hand (or recovering an expired cert)
+
+The stack stays up; this also rewrites the lineage's stored authenticator to
+webroot, so later `certbot renew` runs take the same path:
+
+```bash
+cd ~/zvezdnik
+docker volume ls | grep certbot          # expect zvezdnik_certbot-www
+
+docker run --rm \
+  -v /etc/letsencrypt:/etc/letsencrypt \
+  -v zvezdnik_certbot-www:/var/www/certbot \
+  certbot/certbot certonly --webroot -w /var/www/certbot \
+  --cert-name zvezdnikbot.ru -d zvezdnikbot.ru \
+  --email kukiz200501@gmail.com --agree-tos --no-eff-email \
+  --force-renewal --non-interactive
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec web nginx -s reload
+```
+
+Check what is actually served (from any machine):
+
+```bash
+curl -sk -m 15 -o /dev/null -w '%{certs}' https://zvezdnikbot.ru/health | grep -E 'Expire date'
+```
+
+> An expired cert takes the bot down too, not just the Mini App: Telegram
+> refuses to deliver webhook updates over untrusted TLS. Confirm recovery with
+> `getWebhookInfo` — `last_error_message` stops mentioning the certificate and
+> `pending_update_count` drains to 0. Updates older than 24h are lost for good.
 
 ### Docker log rotation
 Add to `/etc/docker/daemon.json`, then `sudo systemctl restart docker`:

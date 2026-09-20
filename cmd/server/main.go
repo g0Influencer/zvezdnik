@@ -123,8 +123,9 @@ func main() {
 		SupplierContact: cfg.SupplierContact,
 	})
 
-	// Set webhook if URL is configured
-	if cfg.WebhookBaseURL != "" {
+	// Set webhook if URL is configured. Skipped in polling mode, which clears
+	// the registration instead (Telegram allows only one delivery method).
+	if cfg.TelegramMode != "polling" && cfg.WebhookBaseURL != "" {
 		webhookURL := cfg.WebhookBaseURL + "/bot/webhook"
 		if err := tgBot.SetWebhook(ctx, webhookURL); err != nil {
 			slog.Error("failed to set telegram webhook", "error", err)
@@ -158,6 +159,16 @@ func main() {
 		}
 		slog.Info("manual push finished")
 		return
+	}
+
+	// Long polling: the bot pulls updates itself. Used when Telegram's inbound
+	// connections to this host time out, which leaves outbound as the only
+	// working direction. Started after the -push-now path so a one-off manual
+	// broadcast doesn't spin up a poller.
+	if cfg.TelegramMode == "polling" {
+		pollCtx, stopPolling := context.WithCancel(context.Background())
+		defer stopPolling()
+		go tgBot.RunPolling(pollCtx)
 	}
 
 	// Setup cron for daily pushes

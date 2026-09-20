@@ -17,6 +17,9 @@ type Config struct {
 	TelegramBotToken   string
 	TelegramMiniAppURL string
 	WebhookBaseURL     string
+	// TelegramMode selects how updates reach the bot: "webhook" (default) or
+	// "polling", for when Telegram cannot open connections to this host.
+	TelegramMode string
 
 	YandexAPIKey   string
 	YandexFolderID string
@@ -90,6 +93,7 @@ func Load() *Config {
 		TelegramBotToken:   os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramMiniAppURL: getEnv("TELEGRAM_MINI_APP_URL", "https://t.me/zvezdnik_bot/app"),
 		WebhookBaseURL:     os.Getenv("WEBHOOK_BASE_URL"),
+		TelegramMode:       getEnv("TELEGRAM_MODE", "webhook"),
 
 		YandexAPIKey:   os.Getenv("YANDEX_API_KEY"),
 		YandexFolderID: os.Getenv("YANDEX_FOLDER_ID"),

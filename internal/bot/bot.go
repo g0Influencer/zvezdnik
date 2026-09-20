@@ -81,6 +81,31 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("telegram api error: %d", e.StatusCode)
 }
 
+// scrubbedError hides the bot token in an error message while keeping the
+// original error chain intact for errors.As/Is.
+type scrubbedError struct {
+	msg string
+	err error
+}
+
+func (e *scrubbedError) Error() string { return e.msg }
+func (e *scrubbedError) Unwrap() error { return e.err }
+
+// scrub strips the bot token from an error. net/http puts the full request URL
+// into its transport errors, and the token sits in that URL — without this,
+// every timeout writes a working token into the logs.
+func (b *Bot) scrub(err error) error {
+	if err == nil || b.token == "" {
+		return err
+	}
+	msg := err.Error()
+	clean := strings.ReplaceAll(msg, b.token, "<token>")
+	if clean == msg {
+		return err
+	}
+	return &scrubbedError{msg: clean, err: err}
+}
+
 // Unreachable reports whether this user can never be messaged again as-is:
 // they blocked the bot (403) or the chat no longer exists (400).
 func (e *APIError) Unreachable() bool {
@@ -121,7 +146,7 @@ func (b *Bot) SetWebhook(ctx context.Context, webhookURL string) error {
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("set webhook: %w", err)
+		return fmt.Errorf("set webhook: %w", b.scrub(err))
 	}
 	defer resp.Body.Close()
 
@@ -144,8 +169,14 @@ func (b *Bot) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	b.handleUpdate(r.Context(), update)
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleUpdate dispatches a single update. Shared by the webhook handler and
+// the long-polling loop so both delivery paths behave identically.
+func (b *Bot) handleUpdate(ctx context.Context, update Update) {
 	if update.Message == nil {
-		w.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -153,22 +184,19 @@ func (b *Bot) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	// emits when a user opens/restarts the bot). They must not hit handleDefault,
 	// which would otherwise post a spurious second "open the app" block.
 	if update.Message.Text == "" {
-		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	switch update.Message.Text {
 	case "/start":
-		b.handleStart(r.Context(), update.Message)
+		b.handleStart(ctx, update.Message)
 	case "/help":
-		b.handleHelp(r.Context(), update.Message)
+		b.handleHelp(ctx, update.Message)
 	case "/oferta":
-		b.handleOferta(r.Context(), update.Message)
+		b.handleOferta(ctx, update.Message)
 	default:
-		b.handleDefault(r.Context(), update.Message)
+		b.handleDefault(ctx, update.Message)
 	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func (b *Bot) handleStart(ctx context.Context, msg *Message) {
@@ -338,7 +366,7 @@ func (b *Bot) sendMessageReturningID(ctx context.Context, msg sendMessageRequest
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("send message: %w", err)
+		return 0, fmt.Errorf("send message: %w", b.scrub(err))
 	}
 	defer resp.Body.Close()
 
@@ -376,7 +404,7 @@ func (b *Bot) pinChatMessage(ctx context.Context, chatID, messageID int64) error
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("pin message: %w", err)
+		return fmt.Errorf("pin message: %w", b.scrub(err))
 	}
 	defer resp.Body.Close()
 
@@ -412,7 +440,7 @@ func (b *Bot) SetMyCommands(ctx context.Context) error {
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("set commands: %w", err)
+		return fmt.Errorf("set commands: %w", b.scrub(err))
 	}
 	defer resp.Body.Close()
 
